@@ -153,6 +153,12 @@ get_r_by_angle(Run_SLFusion::real angle)
     return r;
 }
 
+static void
+put_index_matching_window(int h, int w, int xr, int xt, int winWidth)
+{
+    
+}
+
 Run_SLFusion::Run_SLFusion()
 : Runnable("SLFusion"),
   IDX_H(0), IDX_W(1), SMALL_VALUE(1e-6)
