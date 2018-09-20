@@ -15,6 +15,14 @@
 #include <boost/exception/all.hpp>
 #include <boost/shared_ptr.hpp>
 
+#define EXCEPTION_BAD_ARGUMENT(v, desc) \
+    {\
+        std::stringstream v##_ss;\
+        v##_ss << "Wrong argument " << #v \
+               << ". " << desc; \
+        BOOST_THROW_EXCEPTION( bad_argument() << ExceptionInfoString( v##_ss.str() ) );\
+    }
+
 #define EXCEPTION_ARG_OUT_OF_RANGE(v, minV, maxV) \
     {\
         std::stringstream v##_ss;\
@@ -48,6 +56,11 @@
                << #v1 << " is " << dimString1 << " and " \
                << #v2 << " is " << dimString2;\
         BOOST_THROW_EXCEPTION( dimension_mismatch() << ExceptionInfoString( exp_ss.str() ) );\
+    }
+
+#define EXCEPTION_BASE(s) \
+    {\
+        BOOST_THROW_EXCEPTION( exception_base() << ExceptionInfoString( s ) );\
     }
 
 namespace slf

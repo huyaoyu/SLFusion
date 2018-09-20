@@ -27,6 +27,7 @@
 #include"cnpy.h"
 
 #include "Runnable/Runnable.hpp"
+#include "BilateralWindowMatcher.hpp"
 
 namespace slf
 {
@@ -52,7 +53,8 @@ public:
     } Side_t;
 
 public:
-	Run_SLFusion();
+    Run_SLFusion();
+	Run_SLFusion(int w, int nw);
 	~Run_SLFusion();
 
 	Runnable::RES_t run(void);
@@ -84,6 +86,8 @@ public:
 private:
     cv::Mat mSrcImgs[2];
     cv::Mat mGreyImgs[2];
+
+    BilateralWindowMatcher* mBWM;
 
     cnpy::NpyArray mArrLIDARMap;
     cv::Mat mLIDARMap;

@@ -153,22 +153,70 @@ get_r_by_angle(Run_SLFusion::real angle)
     return r;
 }
 
-static void
-put_index_matching_window(int h, int w, int xr, int xt, int winWidth)
+/** Pad an OpenCV Mat.
+ * 
+ * \param _src The source mat.
+ * \param w The kernel size. An positive odd integer.
+ * \param nw The number of kernels. An positive odd integer.
+ * \param spv The value to be put into the padded area. It could only take a cv::Scalar object.
+ * \param _dst The output padded mat.
+ * \return 0 for success, non-zero for error.
+ * 
+ */
+static int
+put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst)
 {
-    
+    // Check the validity of w and nw.
+    if ( 0x01 & w == 0x00 || w <= 0)
+    {
+        std::cout << "put_padded_mat: w should be a positive odd integer. w = " << w << "." << std::endl;
+        return -1;
+    }
+
+    if ( 0x01 & nw == 0x00 || nw <= 0 )
+    {
+        std::cout << "put_added_mat: nw should be a positive odd integer. nw = " << nw << "." << std::endl;
+        return -1;
+    }
+
+    // Windows size.
+    int W = nw * w;
+    // Padding width.
+    int P = ( W - 1 ) / 2;
+
+    // Source mat.
+    cv::Mat src = _src.getMat();
+
+    // New mat.
+    _dst.create( src.rows + P * 2, src.cols + P * 2, src.type() );
+	cv::Mat dst = _dst.getMat();
+
+    // Padding.
+    cv::copyMakeBorder(src, dst, P, P, P, P, cv::BORDER_CONSTANT, spv);
+
+    return 0;
 }
 
 Run_SLFusion::Run_SLFusion()
 : Runnable("SLFusion"),
   IDX_H(0), IDX_W(1), SMALL_VALUE(1e-6)
 {
+    mBWM = new BilateralWindowMatcher(3, 13);
+}
 
+Run_SLFusion::Run_SLFusion(int w, int nw)
+: Runnable("SLFusion"),
+  IDX_H(0), IDX_W(1), SMALL_VALUE(1e-6)
+{
+    mBWM = new BilateralWindowMatcher(w, nw);
 }
 
 Run_SLFusion::~Run_SLFusion()
 {
-
+    if ( NULL != mBWM )
+    {
+        delete mBWM; mBWM = NULL;
+    }
 }
 
 Runnable::RES_t Run_SLFusion::put_sides( const Vec_t& r, Side_t& s0, Side_t& s1 )
@@ -494,11 +542,36 @@ Runnable::RES_t Run_SLFusion::run(void)
 			EXCEPTION_FILE_OPEN_FAILED(expString);
 		}
 
+        // ================= Image padding. ==================
+        cv::Mat paddedImg[2];
+        cv::Scalar spv = cv::Scalar(0, 0, 0);
+        if ( 0 != put_padded_mat( mSrcImgs[0], 3, 13, spv, paddedImg[0] ) )
+        {
+            std::cout << "put_padded_mat failed." << std::endl;
+            EXCEPTION_BASE( "put_padded_mat failed." );
+        }
+
+        if ( 0 != put_padded_mat( mSrcImgs[1], 3, 13, spv, paddedImg[1] ) )
+        {
+            std::cout << "put_padded_mat failed." << std::endl;
+            EXCEPTION_BASE( "put_padded_mat failed." );
+        }
+
+        std::cout << "paddedImage: rows = " << paddedImg[0].rows
+                  << ", cols = " << paddedImg[0].cols
+                  << std::endl;
+
 		// Show the grey images.
 		cv::namedWindow("Greyscale image left", cv::WINDOW_NORMAL );
 		cv::imshow("Greyscale image left", mGreyImgs[0] );
 		cv::namedWindow("Greyscale image right", cv::WINDOW_NORMAL );
 		cv::imshow("Greyscale image right", mGreyImgs[1] );
+
+        cv::namedWindow("Padded image left", cv::WINDOW_NORMAL);
+        cv::imshow("Padded image left", paddedImg[0]);
+
+        // Test the BilateralWindowMatcher.
+        mBWM->show_index_maps();
 
 		// Warp operation.
 		cv::Mat warped; // Warped image.
