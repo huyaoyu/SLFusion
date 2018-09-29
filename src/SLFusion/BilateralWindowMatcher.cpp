@@ -143,7 +143,15 @@ put_index_map(MatrixXi& ri, MatrixXi& ci,
 static void
 put_distance_map(MatrixXd& rm, const MatrixXi& knlRfnIdxRow, const MatrixXi& knlRfnIdxCol)
 {
-    
+    // No dimension check here.
+
+    // Get the original index of the center of the central kernal.
+    int cntPos = ( knlRfnIdxRow.rows() - 1 ) / 2;
+
+    int cntRow = knlRfnIdxRow( cntPos, cntPos );
+    int cntCol = knlRfnIdxCol( cntPos, cntPos );
+
+    rm = ( (knlRfnIdxRow.array() - cntRow).pow(2.0) + (knlRfnIdxCol.array() - cntRow).pow(2.0) ).sqrt()
 }
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
