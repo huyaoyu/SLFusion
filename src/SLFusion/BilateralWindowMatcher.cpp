@@ -141,17 +141,20 @@ put_index_map(MatrixXi& ri, MatrixXi& ci,
 }
 
 static void
-put_distance_map(MatrixXd& rm, const MatrixXi& knlRfnIdxRow, const MatrixXi& knlRfnIdxCol)
+put_distance_map(MatrixXd& rm, const MatrixXi& knlPntIdxRowMap, const MatrixXi& knlPntIdxColMap)
 {
     // No dimension check here.
 
     // Get the original index of the center of the central kernal.
-    int cntPos = ( knlRfnIdxRow.rows() - 1 ) / 2;
+    int cntPos = ( knlPntIdxRowMap.rows() - 1 ) / 2;
 
-    int cntRow = knlRfnIdxRow( cntPos, cntPos );
-    int cntCol = knlRfnIdxCol( cntPos, cntPos );
+    int cntRow = knlPntIdxRowMap( cntPos, cntPos );
+    int cntCol = knlPntIdxColMap( cntPos, cntPos );
 
-    rm = ( (knlRfnIdxRow.array() - cntRow).pow(2.0) + (knlRfnIdxCol.array() - cntRow).pow(2.0) ).sqrt()
+    rm = ( 
+          (knlPntIdxRowMap.array() - cntRow).pow(2.0) 
+        + (knlPntIdxColMap.array() - cntRow).pow(2.0) 
+        ).sqrt().matrix().cast<double>();
 }
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
@@ -165,8 +168,8 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 
     if ( 0x01 & nw == 0x00 || nw <= 0 )
     {
-        std::cout << "put_added_mat: nw should be a positive odd integer. nw = " << nw << "." << std::endl;
-        EXCEPTION_BAD_ARGUMENT(w, "A positive odd integer is expected.");
+        std::cout << "nw should be a positive odd integer. nw = " << nw << "." << std::endl;
+        EXCEPTION_BAD_ARGUMENT(nw, "A positive odd integer is expected.");
     }
 
     mKernelSize = w;
@@ -175,19 +178,22 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
     // Create the index map and distance map.
     int windowWidth = nw * w;
 
-    mIndexMapRow = MatrixXi(windowWidth, windowWidth);
-    mIndexMapCol = MatrixXi(windowWidth, windowWidth);
-    mIndexRefRow = MatrixXi(windowWidth, windowWidth);
-    mIndexRefCol = MatrixXi(windowWidth, windowWidth);
-    mKnlIdxInRfnRow = MatrixXi(nw, nw);
-    mKnlIdxInRfnCol = MatrixXi(nw, nw);
+    mIndexMapRow  = MatrixXi(windowWidth, windowWidth);
+    mIndexMapCol  = MatrixXi(windowWidth, windowWidth);
+    mKnlIdxRow    = MatrixXi(windowWidth, windowWidth);
+    mKnlIdxCol    = MatrixXi(windowWidth, windowWidth);
+    mKnlPntIdxRow = MatrixXi(nw, nw);
+    mKnlPntIdxCol = MatrixXi(nw, nw);
 
     mDistanceMap = MatrixXd(windowWidth, windowWidth);
 
     mDistanceRef = MatrixXd(nw, nw);
 
     // Put index maps.
-    put_index_map( mIndexMapRow, mIndexMapCol, mIndexRefRow, mIndexRefCol, mKnlIdxInRfnRow, mKnlIdxInRfnCol, w );
+    put_index_map( mIndexMapRow, mIndexMapCol, mKnlIdxRow, mKnlIdxCol, mKnlPntIdxRow, mKnlPntIdxCol, w );
+
+    // Put distance map.
+    put_distance_map( mDistanceMap, mIndexMapRow, mIndexMapCol );
 }
 
 BilateralWindowMatcher::~BilateralWindowMatcher()
@@ -204,16 +210,19 @@ void BilateralWindowMatcher::show_index_maps(void)
     std::cout << mIndexMapCol << std::endl;
 
     std::cout << "Reference row index map: " << std::endl;
-    std::cout << mIndexRefRow << std::endl;
+    std::cout << mKnlIdxRow << std::endl;
 
     std::cout << "Reference col index map: " << std::endl;
-    std::cout << mIndexRefCol << std::endl;
+    std::cout << mKnlIdxCol << std::endl;
 
     std::cout << "Kernel row index in the reference matrix: " << std::endl;
-    std::cout << mKnlIdxInRfnRow << std::endl;
+    std::cout << mKnlPntIdxRow << std::endl;
 
     std::cout << "Kernel col index in the reference matrix: " << std::endl;
-    std::cout << mKnlIdxInRfnCol << std::endl;
+    std::cout << mKnlPntIdxCol << std::endl;
+
+    std::cout << "Distance map: " << std::endl;
+    std::cout << mDistanceMap << std::endl;
 }
 
 int BilateralWindowMatcher::get_kernel_size(void)

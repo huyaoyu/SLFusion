@@ -35,11 +35,11 @@ protected:
     MatrixXi mIndexMapRow; // A 2D map. Each element of this map records its central row index in the original window.
     MatrixXi mIndexMapCol; // A 2D map. Each element of this map records its central col index in the original window.
 
-    MatrixXi mIndexRefRow; // A 2D reference map. Each element of this map records its row index in the gridded, small matrix.
-    MatrixXi mIndexRefCol; // A 2D reference map. Each element of this map records its col index in the gridded, small matrix.
+    MatrixXi mKnlIdxRow; // A 2D reference map. Each element of this map records its row index in the gridded, small matrix.
+    MatrixXi mKnlIdxCol; // A 2D reference map. Each element of this map records its col index in the gridded, small matrix.
 
-    MatrixXi mKnlIdxInRfnRow; // A 2D index matrix. Each element is the original row index of a single kernel center.
-    MatrixXi mKnlIdxInRfnCol; // A 2D index matrix. Each element is the original col index of a single kernel center.
+    MatrixXi mKnlPntIdxRow; // A 2D index matrix. Each element is the original row index of a single kernel center.
+    MatrixXi mKnlPntIdxCol; // A 2D index matrix. Each element is the original col index of a single kernel center.
 
     MatrixXd mDistanceMap; // A 2D map. Each element of this map records its distance from the center of the window.
     MatrixXd mDistanceRef; // A small 2D matrix. Each element of this matrix is the referenced distance from a kernel center to the window center.

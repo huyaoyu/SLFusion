@@ -24,7 +24,7 @@
 // The cnpy package is requried.
 // Find it at
 // https://github.com/rogersce/cnpy
-#include"cnpy.h"
+#include "cnpy.h"
 
 #include "Runnable/Runnable.hpp"
 #include "BilateralWindowMatcher.hpp"
