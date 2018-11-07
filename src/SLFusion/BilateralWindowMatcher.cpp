@@ -157,7 +157,14 @@ put_distance_map(MatrixXd& rm, const MatrixXi& knlPntIdxRowMap, const MatrixXi& 
         ).sqrt().matrix().cast<double>();
 }
 
+static void
+put_Ws_map( const MatrixXd& distanceMap, double gs, MatrixXd& Ws)
+{
+    Ws = (-1.0 * distanceMap / gs).array().exp().matrix();
+}
+
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
+: mGammaS(14), mGammaC(23)
 {
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
@@ -182,18 +189,33 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
     mIndexMapCol  = MatrixXi(windowWidth, windowWidth);
     mKnlIdxRow    = MatrixXi(windowWidth, windowWidth);
     mKnlIdxCol    = MatrixXi(windowWidth, windowWidth);
-    mKnlPntIdxRow = MatrixXi(nw, nw);
-    mKnlPntIdxCol = MatrixXi(nw, nw);
+    mPntIdxKnlRow = MatrixXi(nw, nw);
+    mPntIdxKnlCol = MatrixXi(nw, nw);
 
     mDistanceMap = MatrixXd(windowWidth, windowWidth);
+    mWsMap       = MatrixXd(windowWidth, windowWidth);
 
-    mDistanceRef = MatrixXd(nw, nw);
+    mPntDistKnl  = MatrixXd(nw, nw);
 
     // Put index maps.
-    put_index_map( mIndexMapRow, mIndexMapCol, mKnlIdxRow, mKnlIdxCol, mKnlPntIdxRow, mKnlPntIdxCol, w );
+    put_index_map( mIndexMapRow, mIndexMapCol, mKnlIdxRow, mKnlIdxCol, mPntIdxKnlRow, mPntIdxKnlCol, w );
 
     // Put distance map.
     put_distance_map( mDistanceMap, mIndexMapRow, mIndexMapCol );
+    put_Ws_map( mDistanceMap, mGammaS, mWsMap );
+
+    // Put point distance of kernels.
+    int idxRow, idxCol;
+    for ( int i = 0; i < nw; i++ )
+    {
+        for ( int j = 0; j < nw; j++ )
+        {
+            idxRow = mPntIdxKnlRow(i, j);
+            idxCol = mPntIdxKnlCol(i, j);
+
+            mPntDistKnl( i, j ) = mDistanceMap( idxRow, idxCol );
+        }
+    }
 }
 
 BilateralWindowMatcher::~BilateralWindowMatcher()
@@ -203,26 +225,35 @@ BilateralWindowMatcher::~BilateralWindowMatcher()
 
 void BilateralWindowMatcher::show_index_maps(void)
 {
+    std::cout << "mKernelSize = " << mKernelSize << std::endl;
+    std::cout << "mNumKernels = " << mNumKernels << std::endl;
+
     std::cout << "Row index map: " << std::endl;
     std::cout << mIndexMapRow << std::endl;
 
     std::cout << "Column index map: " << std::endl;
     std::cout << mIndexMapCol << std::endl;
 
-    std::cout << "Reference row index map: " << std::endl;
+    std::cout << "Kernel index row: " << std::endl;
     std::cout << mKnlIdxRow << std::endl;
 
-    std::cout << "Reference col index map: " << std::endl;
+    std::cout << "Kernel index column: " << std::endl;
     std::cout << mKnlIdxCol << std::endl;
 
-    std::cout << "Kernel row index in the reference matrix: " << std::endl;
-    std::cout << mKnlPntIdxRow << std::endl;
+    std::cout << "Point index of the kernel, row: " << std::endl;
+    std::cout << mPntIdxKnlRow << std::endl;
 
-    std::cout << "Kernel col index in the reference matrix: " << std::endl;
-    std::cout << mKnlPntIdxCol << std::endl;
+    std::cout << "Point index of the kernel, column: " << std::endl;
+    std::cout << mPntIdxKnlCol << std::endl;
 
     std::cout << "Distance map: " << std::endl;
     std::cout << mDistanceMap << std::endl;
+
+    std::cout << "Point distance of kernel: " << std::endl;
+    std::cout << mPntDistKnl << std::endl;
+
+    std::cout << "Ws map: " << std::endl;
+    std::cout << mWsMap << std::endl;
 }
 
 int BilateralWindowMatcher::get_kernel_size(void)
@@ -233,4 +264,26 @@ int BilateralWindowMatcher::get_kernel_size(void)
 int BilateralWindowMatcher::get_num_kernels_single_side(void)
 {
     return mNumKernels;
+}
+
+void BilateralWindowMatcher::set_gamma_s(real gs)
+{
+    mGammaS = gs;
+}
+
+BilateralWindowMatcher::real 
+BilateralWindowMatcher::get_gamma_s(void)
+{
+    return mGammaS;
+}
+
+void BilateralWindowMatcher::set_gamma_c(real gc)
+{
+    mGammaC = gc;
+}
+
+BilateralWindowMatcher::real 
+BilateralWindowMatcher::get_gamma_c(void)
+{
+    return mGammaC;
 }

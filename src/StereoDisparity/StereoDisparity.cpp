@@ -200,8 +200,8 @@ static void mutual_information(cv::InputArray _s1, cv::InputArray _s2, cv::Outpu
 
 	cv::Mat p1, p2;
 
-	cv::reduce(histDst, p1, 1, CV_REDUCE_SUM, CV_32FC1);
-	cv::reduce(histDst, p2, 0, CV_REDUCE_SUM, CV_32FC1);
+	cv::reduce(histDst, p1, 1, cv::REDUCE_SUM, CV_32FC1);
+	cv::reduce(histDst, p2, 0, cv::REDUCE_SUM, CV_32FC1);
 
 	// === Gaussian convolution with GaussianBlur. ===
 	cv::Mat GBDst;
