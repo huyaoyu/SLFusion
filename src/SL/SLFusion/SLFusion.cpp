@@ -581,9 +581,6 @@ Runnable::RES_t Run_SLFusion::run(void)
         // Test the BilateralWindowMatcher.
         mBWM->show_index_maps();
 
-        // // Test the average color values.
-        // cv::Mat matTestAvgColorValues = cv::imread("../data/SLFusion/DummyImage_TestAverageColorValues.bmp", cv::IMREAD_COLOR);
-
 		// Warp operation.
 		cv::Mat warped; // Warped image.
 

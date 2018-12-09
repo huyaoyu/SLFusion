@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(SLFusion)
 
 # ## Compile as C++11
@@ -44,7 +44,7 @@ include_directories(
 # >>>
 # Search the ./src folder for .cpp files.
 
-FILE(GLOB_RECURSE SRC_LIST *.cpp)
+FILE(GLOB_RECURSE SRC_LIST SL/*.cpp)
 
 IF (SRC_LIST)
 	FOREACH (SFILE ${SRC_LIST})
@@ -55,7 +55,7 @@ ENDIF (SRC_LIST)
 # Declare a C++ executable
 # With catkin_make all packages are built within a single CMake context
 # The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_exe ${SRC_LIST})
+add_executable(exe_${PROJECT_NAME} ${SRC_LIST} main.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
@@ -103,8 +103,21 @@ SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${CXX_FLAGS}" )
 SET( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
 
 # Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}_exe ${OpenCV_LIBS}
+target_link_libraries(exe_${PROJECT_NAME} ${OpenCV_LIBS}
   ${LIB_BOOST_EXCEPTION}
   ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${CNPY_LIBRARIES} z
 )
 
+FILE(GLOB_RECURSE SRC_LIST_TEST SL_Test/*.cpp)
+
+add_executable(test_${PROJECT_NAME} ${SRC_LIST} ${SRC_LIST_TEST} test.cpp)
+
+find_package(GTest)
+message(STATUS "GTest_FOUND = ${GTest_FOUND}")
+message(STATUS "GTest_LIBRARIES = ${GTEST_LIBRARIES}")
+
+target_link_libraries(test_${PROJECT_NAME} 
+  ${GTEST_LIBRARIES} 
+  ${OpenCV_LIBS} ${LIB_BOOST_EXCEPTION}
+  ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${CNPY_LIBRARIES} z
+)

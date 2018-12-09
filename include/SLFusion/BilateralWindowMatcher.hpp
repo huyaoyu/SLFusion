@@ -9,6 +9,8 @@
 #include <eigen3/Eigen/Dense>
 #include <opencv2/core.hpp>
 
+#include <gtest/gtest.h>
+
 #include "SLFException/SLFException.hpp"
 
 // Name space delaration.
@@ -64,6 +66,48 @@ protected:
 
     Real_t mGammaS;
     Real_t mGammaC;
+
+public:
+    friend class Test_BilateralWindowMatcher;
+    FRIEND_TEST(Test_BilateralWindowMatcher, average_color_values);
+};
+
+class Test_BilateralWindowMatcher : public ::testing::Test
+{
+protected:
+    static void SetUpTestCase()
+    {
+        mBWM = new BilateralWindowMatcher( 3, 13 );
+    }
+
+    static void TearDownTestCase()
+    {
+        if ( NULL != mBWM )
+        {
+            delete mBWM; mBWM = NULL;
+        }
+    }
+
+    virtual void SetUp()
+    {
+        // if ( NULL != mBWM )
+        // {
+        //     delete mBWM;
+        // }
+
+        // mBWM = new BilateralWindowMatcher( 3, 13 );
+    }
+
+    virtual void TearDown()
+    {
+        // if ( NULL != mBWM )
+        // {
+        //     delete mBWM; mBWM = NULL;
+        // }
+    }
+
+protected:
+    static BilateralWindowMatcher* mBWM;
 };
 
 } // namespace slf.

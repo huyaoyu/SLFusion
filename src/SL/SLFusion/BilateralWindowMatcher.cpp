@@ -305,6 +305,7 @@ void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArr
     Mat dst;
     if ( 3 == channels )
     {
+        std::cout << "mNumKernals = " << mNumKernels << std::endl;
         _dst.create( mNumKernels, mNumKernels, CV_32FC3 );
         dst = _dst.getMat();
     }
