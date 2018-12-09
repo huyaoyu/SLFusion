@@ -449,8 +449,16 @@ Runnable::RES_t Run_SLFusion::read_images( const std::string& fn0, const std::st
               << mSrcImgs[0].size[1] << ")" << std::endl;
 
 	// Generate grey scale images.
-	cv::cvtColor(mSrcImgs[0], mGreyImgs[0], cv::COLOR_BGR2GRAY, 1);
-	cv::cvtColor(mSrcImgs[1], mGreyImgs[1], cv::COLOR_BGR2GRAY, 1);
+    BEGIN_IMAGE_LOOP
+	    cv::cvtColor(mSrcImgs[_idx], mGreyImgs[_idx], cv::COLOR_BGR2GRAY, 1);
+	END_IMAGE_LOOP
+
+    // Generate CIELab images.
+    BEGIN_IMAGE_LOOP
+        cv::cvtColor( mSrcImgs[_idx], mCIELabImgs[_idx], cv::COLOR_BGR2Lab );
+        // It should be CV_8UC3 (type = 16) if mSrcImgs is CV_8UC3.
+        std::cout << "MCIELab matrix type = " << mCIELabImgs[_idx].type() << std::endl;
+    END_IMAGE_LOOP
 
 	return Runnable::OK;
 }
@@ -572,6 +580,9 @@ Runnable::RES_t Run_SLFusion::run(void)
 
         // Test the BilateralWindowMatcher.
         mBWM->show_index_maps();
+
+        // // Test the average color values.
+        // cv::Mat matTestAvgColorValues = cv::imread("../data/SLFusion/DummyImage_TestAverageColorValues.bmp", cv::IMREAD_COLOR);
 
 		// Warp operation.
 		cv::Mat warped; // Warped image.

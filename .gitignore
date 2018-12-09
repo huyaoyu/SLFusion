@@ -2,3 +2,7 @@ build/
 data/
 *.code-workspace
 .vscode/
+*.bmp
+*.jpg
+*.png
+*.pyc

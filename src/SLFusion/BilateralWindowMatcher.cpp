@@ -1,14 +1,18 @@
 
 #include "SLFusion/BilateralWindowMatcher.hpp"
 
-using Eigen::MatrixXd;
-using Eigen::MatrixXi;
+using namespace cv;
+using namespace Eigen;
 using namespace slf;
 
+typedef BilateralWindowMatcher::IMatrix_t IM_t;
+typedef BilateralWindowMatcher::FMatrix_t FM_t;
+typedef BilateralWindowMatcher::Real_t    R_t;
+
 static void
-put_index_map(MatrixXi& ri, MatrixXi& ci, 
-    MatrixXi& rri, MatrixXi& rci, 
-    MatrixXi& knlRfnIdxRow, MatrixXi& knlRfnIdxCol, 
+put_index_map(IM_t& ri, IM_t& ci, 
+    IM_t& rri, IM_t& rci, 
+    IM_t& knlRfnIdxRow, IM_t& knlRfnIdxCol, 
     int w)
 {
     // Check compatibility between m and w.
@@ -141,24 +145,24 @@ put_index_map(MatrixXi& ri, MatrixXi& ci,
 }
 
 static void
-put_distance_map(MatrixXd& rm, const MatrixXi& knlPntIdxRowMap, const MatrixXi& knlPntIdxColMap)
+put_distance_map(FM_t& rm, const IM_t& knlPntIdxRowMap, const IM_t& knlPntIdxColMap)
 {
     // No dimension check here.
 
     // Get the original index of the center of the central kernal.
     int cntPos = ( knlPntIdxRowMap.rows() - 1 ) / 2;
 
-    int cntRow = knlPntIdxRowMap( cntPos, cntPos );
-    int cntCol = knlPntIdxColMap( cntPos, cntPos );
+    const int cntRow = knlPntIdxRowMap( cntPos, cntPos );
+    const int cntCol = knlPntIdxColMap( cntPos, cntPos );
 
     rm = ( 
-          (knlPntIdxRowMap.array() - cntRow).pow(2.0) 
-        + (knlPntIdxColMap.array() - cntRow).pow(2.0) 
-        ).sqrt().matrix().cast<double>();
+          (knlPntIdxRowMap.array() - cntRow).pow(2) 
+        + (knlPntIdxColMap.array() - cntRow).pow(2) 
+        ).sqrt().matrix().cast<R_t>();
 }
 
 static void
-put_Ws_map( const MatrixXd& distanceMap, double gs, MatrixXd& Ws)
+put_Ws_map( const FM_t& distanceMap, double gs, FM_t& Ws)
 {
     Ws = (-1.0 * distanceMap / gs).array().exp().matrix();
 }
@@ -185,17 +189,17 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
     // Create the index map and distance map.
     int windowWidth = nw * w;
 
-    mIndexMapRow  = MatrixXi(windowWidth, windowWidth);
-    mIndexMapCol  = MatrixXi(windowWidth, windowWidth);
-    mKnlIdxRow    = MatrixXi(windowWidth, windowWidth);
-    mKnlIdxCol    = MatrixXi(windowWidth, windowWidth);
-    mPntIdxKnlRow = MatrixXi(nw, nw);
-    mPntIdxKnlCol = MatrixXi(nw, nw);
+    mIndexMapRow  = IMatrix_t(windowWidth, windowWidth);
+    mIndexMapCol  = IMatrix_t(windowWidth, windowWidth);
+    mKnlIdxRow    = IMatrix_t(windowWidth, windowWidth);
+    mKnlIdxCol    = IMatrix_t(windowWidth, windowWidth);
+    mPntIdxKnlRow = IMatrix_t(nw, nw);
+    mPntIdxKnlCol = IMatrix_t(nw, nw);
 
-    mDistanceMap = MatrixXd(windowWidth, windowWidth);
-    mWsMap       = MatrixXd(windowWidth, windowWidth);
+    mDistanceMap = FMatrix_t(windowWidth, windowWidth);
+    mWsMap       = FMatrix_t(windowWidth, windowWidth);
 
-    mPntDistKnl  = MatrixXd(nw, nw);
+    mPntDistKnl  = FMatrix_t(nw, nw);
 
     // Put index maps.
     put_index_map( mIndexMapRow, mIndexMapCol, mKnlIdxRow, mKnlIdxCol, mPntIdxKnlRow, mPntIdxKnlCol, w );
@@ -266,24 +270,92 @@ int BilateralWindowMatcher::get_num_kernels_single_side(void)
     return mNumKernels;
 }
 
-void BilateralWindowMatcher::set_gamma_s(real gs)
+void BilateralWindowMatcher::set_gamma_s(Real_t gs)
 {
     mGammaS = gs;
 }
 
-BilateralWindowMatcher::real 
+R_t 
 BilateralWindowMatcher::get_gamma_s(void)
 {
     return mGammaS;
 }
 
-void BilateralWindowMatcher::set_gamma_c(real gc)
+void BilateralWindowMatcher::set_gamma_c(Real_t gc)
 {
     mGammaC = gc;
 }
 
-BilateralWindowMatcher::real 
+R_t 
 BilateralWindowMatcher::get_gamma_c(void)
 {
     return mGammaC;
+}
+
+void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArray _dst)
+{
+    Mat src = _src.getMat();
+    
+    // Make sure the input Mat object has a depth of CV_8U.
+    CV_Assert( CV_8U == src.depth() );
+
+    const int channels = src.channels();
+
+    // Create a new Mat for the output.
+    Mat dst;
+    if ( 3 == channels )
+    {
+        _dst.create( mNumKernels, mNumKernels, CV_32FC3 );
+        dst = _dst.getMat();
+    }
+    else if ( 1 == channels )
+    {
+        _dst.create( mNumKernels, mNumKernels, CV_32FC1 );
+        dst = _dst.getMat();
+    }
+    else
+    {
+        // Error!
+    }
+
+    // Clear data in dst.
+    dst.setTo( Scalar::all(0.0) );
+
+    // Loop over every individual pixel in _src.
+    uchar* pS = NULL;
+    float* pD = NULL;
+    int kernelIndexRow = 0, kernelIndexCol = 0;
+    int pos = 0;
+    int* const knlIdxRow = mKnlIdxRow.data();
+    int* const knlIdxCol = mKnlIdxCol.data();
+
+    for ( int i = 0; i < src.rows; ++i )
+    {
+        pS = src.ptr<uchar>(i);
+
+        // Pointer to the dst Mat.
+        kernelIndexRow = *( knlIdxRow + pos );
+        pD = dst.ptr<float>( kernelIndexRow );
+
+        for ( int j = 0; j < src.cols; ++j )
+        {
+            kernelIndexCol = *( knlIdxCol + pos );
+
+            for ( int k = 0; k < channels; ++k )
+            {
+                (*( pD + kernelIndexCol * channels + k )) += 
+                (*( pS +              j * channels + k ));
+            }
+
+            pos++;
+        }
+    }
+
+    // Calculate the average.
+    dst /= mKernelSize * mKernelSize;
+}
+
+void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc)
+{
+    // Assuming that we are only work with Mat whoes depth is CV_8U.
 }

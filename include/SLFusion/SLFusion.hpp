@@ -29,6 +29,13 @@
 #include "Runnable/Runnable.hpp"
 #include "BilateralWindowMatcher.hpp"
 
+#define BEGIN_IMAGE_LOOP \
+    for ( int _idx = 0; _idx < 2; _idx++ ) \
+    {
+
+#define END_IMAGE_LOOP \
+    }
+
 namespace slf
 {
 
@@ -86,6 +93,7 @@ public:
 private:
     cv::Mat mSrcImgs[2];
     cv::Mat mGreyImgs[2];
+    cv::Mat mCIELabImgs[2];
 
     BilateralWindowMatcher* mBWM;
 
