@@ -1,3 +1,4 @@
+#include <cmath>
 
 #include "SLFusion/BilateralWindowMatcher.hpp"
 
@@ -168,7 +169,8 @@ put_Ws_map( const FM_t& distanceMap, double gs, FM_t& Ws)
 }
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
-: mGammaS(14), mGammaC(23)
+: OCV_F_TYPE(CV_32FC1),
+  mGammaS(14), mGammaC(23)
 {
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
@@ -187,17 +189,17 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
     mNumKernels = nw;
 
     // Create the index map and distance map.
-    int windowWidth = nw * w;
+    mWindowWidth = nw * w;
 
-    mIndexMapRow  = IMatrix_t(windowWidth, windowWidth);
-    mIndexMapCol  = IMatrix_t(windowWidth, windowWidth);
-    mKnlIdxRow    = IMatrix_t(windowWidth, windowWidth);
-    mKnlIdxCol    = IMatrix_t(windowWidth, windowWidth);
+    mIndexMapRow  = IMatrix_t(mWindowWidth, mWindowWidth);
+    mIndexMapCol  = IMatrix_t(mWindowWidth, mWindowWidth);
+    mKnlIdxRow    = IMatrix_t(mWindowWidth, mWindowWidth);
+    mKnlIdxCol    = IMatrix_t(mWindowWidth, mWindowWidth);
     mPntIdxKnlRow = IMatrix_t(nw, nw);
     mPntIdxKnlCol = IMatrix_t(nw, nw);
 
-    mDistanceMap = FMatrix_t(windowWidth, windowWidth);
-    mWsMap       = FMatrix_t(windowWidth, windowWidth);
+    mDistanceMap = FMatrix_t(mWindowWidth, mWindowWidth);
+    mWsMap       = FMatrix_t(mWindowWidth, mWindowWidth);
 
     mPntDistKnl  = FMatrix_t(nw, nw);
 
@@ -270,6 +272,11 @@ int BilateralWindowMatcher::get_num_kernels_single_side(void)
     return mNumKernels;
 }
 
+int BilateralWindowMatcher::get_window_width(void)
+{
+    return mWindowWidth;
+}
+
 void BilateralWindowMatcher::set_gamma_s(Real_t gs)
 {
     mGammaS = gs;
@@ -305,7 +312,7 @@ void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArr
     Mat dst;
     if ( 3 == channels )
     {
-        std::cout << "mNumKernals = " << mNumKernels << std::endl;
+        // std::cout << "mNumKernals = " << mNumKernels << std::endl;
         _dst.create( mNumKernels, mNumKernels, CV_32FC3 );
         dst = _dst.getMat();
     }
@@ -317,6 +324,7 @@ void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArr
     else
     {
         // Error!
+        EXCEPTION_BASE( "Mat with only 1 or 3 channels is supported." );
     }
 
     // Clear data in dst.
@@ -356,7 +364,88 @@ void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArr
     dst /= mKernelSize * mKernelSize;
 }
 
-void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc)
+void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat* bufferS, Mat* bufferK)
 {
-    // Assuming that we are only work with Mat whoes depth is CV_8U.
+    // To see if we have external buffer provided.
+    bool tempBufferS = false, tempBufferK = false;
+
+    if ( NULL == bufferS )
+    {
+        // Overwrite the input argument!
+        bufferS = new Mat( mWindowWidth, mWindowWidth, OCV_F_TYPE );
+        tempBufferS = true;
+    }
+
+    if ( NULL == bufferK )
+    {
+        // Overwite the input argument!
+        bufferK = new Mat( mNumKernels, mNumKernels, OCV_F_TYPE );
+        tempBufferK = true;
+    }
+
+    // Calculate the average color values.
+    put_average_color_values( src, *bufferK );
+
+    // NOTE: wc has to be row-major to maintain the performance.
+    const uchar*  pSrc   = NULL;
+    Real_t* pAvgColorVal = NULL;
+    int kernelIndexRow   = 0, kernelIndexCol = 0;
+    int pos              = 0;
+    int* const knlIdxRow = mKnlIdxRow.data();
+    int* const knlIdxCol = mKnlIdxCol.data();
+    const int channels   = src.channels();
+
+    Real_t colorDiff     = 0.0;
+    Real_t colorDist     = 0.0; // Color distance. L2 distance.
+
+    uchar colorSrc[3]    = {0, 0, 0};
+    int centerIdx        = (mWindowWidth - 1) / 2;
+
+    Real_t* pWC          = wc.data();
+
+    pSrc = src.ptr<uchar>(centerIdx);
+    for ( int i = 0; i < channels; ++i )
+    {
+        colorSrc[i] = *( pSrc + centerIdx*channels + i );
+    }
+
+    for ( int i = 0; i < src.rows; ++i )
+    {
+        pSrc = src.ptr<uchar>( i );
+
+        kernelIndexRow = *( knlIdxRow + pos );
+        pAvgColorVal   = bufferK->ptr<Real_t>( kernelIndexRow );
+
+        for ( int j = 0; j < src.cols; ++j )
+        {
+            kernelIndexCol = *( knlIdxCol + pos );
+
+            colorDist = 0.0;
+
+            for ( int k = 0; k < channels; ++k )
+            {
+                colorDiff = 
+                    colorSrc[k] - *( pAvgColorVal + kernelIndexCol*channels + k );
+                
+                colorDist += colorDiff * colorDiff;
+            }
+
+            colorDist = std::sqrt( colorDist );
+
+            *( pWC + pos ) = std::exp( -colorDist / mGammaC );
+
+            pos++;
+        }
+    }
+
+    // Release the memory.
+    if ( true == tempBufferK )
+    {
+        delete bufferK; bufferK = NULL;
+    }
+
+    if ( true == tempBufferS )
+    {
+        delete bufferS; bufferS = NULL;
+    }
 }
