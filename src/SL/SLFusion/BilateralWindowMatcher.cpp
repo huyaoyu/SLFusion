@@ -170,7 +170,7 @@ put_Ws_map( const FM_t& distanceMap, double gs, FM_t& Ws)
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 : OCV_F_TYPE(CV_32FC1),
-  mGammaS(14), mGammaC(23)
+  mGammaS(14), mGammaC(23), mTAD_T(100)
 {
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
@@ -448,4 +448,193 @@ void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat* bufferS,
     {
         delete bufferS; bufferS = NULL;
     }
+}
+
+template<typename tR, typename tT> 
+BilateralWindowMatcher::Real_t BilateralWindowMatcher::TAD( const tR* pr, const tT* pt, int channels )
+{
+    Real_t temp = 0.0;
+
+    for ( int i = 0; i < channels; ++i )
+    {
+        temp += ( pr[i] - pt[i] ) * ( pr[i] - pt[i] );
+    }
+
+    return (Real_t)( 
+        std::min( std::fabs( temp ), mTAD_T ) 
+        );
+}
+
+void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad)
+{
+    // The rows and cols of ref and tst are assumed to be the same.
+    const int channels = ref.channels();
+    const uchar* pRef  = NULL;
+    const uchar* pTst  = NULL;
+
+    R_t temp = 0.0;
+
+    int posCol = 0, posColShift = 0;
+    int posTad = 0;
+
+    for ( int i = 0; i < ref.rows; ++i )
+    {
+        // Get the pointer to the ref and tst.
+        pRef = ref.ptr<uchar>(i);
+        pTst = ref.ptr<uchar>(i);
+
+        posCol = 0;
+
+        for ( int j = 0; j < ref.cols; ++j )
+        {
+            temp        = 0.0;
+            posColShift = posCol;
+
+            for ( int k = 0; k < channels; ++k)
+            {
+                temp += 
+                ( pRef[posColShift] - pTst[posColShift] ) * 
+                ( pRef[posColShift] - pTst[posColShift] );
+
+                posColShift++;
+            }
+
+            *(tad.data() + posTad) = std::min( std::sqrt(temp), mTAD_T );
+
+            posCol += channels;
+        }
+    }
+}
+
+void BilateralWindowMatcher::match_single_line(
+        const Mat& refMat, const Mat& tstMat, int rowIdx,
+        int minDisp, int maxDisp, 
+        MatchingCost<BilateralWindowMatcher::Real_t>* pMC, int* nMC )
+{
+    // Expecting input images have the same width.
+    if ( refMat.cols != tstMat.cols )
+    {
+        std::stringstream ssRef;
+        ssRef << "( " << refMat.cols << ", " << refMat.rows << " )";
+
+        std::stringstream ssTst;
+        ssTst << "( " << tstMat.cols << ", " << tstMat.rows << " )";
+
+        EXCEPTION_DIMENSION_MISMATCH(refMat, ssRef.str(), tstMat, ssTst.str());
+    }
+
+    int halfCount = (mWindowWidth - 1) / 2;
+
+    // The input images must have enough rows.
+    if ( refMat.rows < mWindowWidth ||
+         tstMat.rows < mWindowWidth ||
+         rowIdx < halfCount ||
+         rowIdx > ( refMat.rows - halfCount - 1 ) || 
+         rowIdx > ( tstMat.rows - halfCount - 1 ) )
+    {
+        std::stringstream ss;
+        ss << "refMat.rows (" << refMat.rows << "), " 
+           << "tstMat.rows (" << tstMat.rows << "), " 
+           << "and rowIdx (" << rowIdx << ") are not compatible.";
+
+        EXCEPTION_BASE( ss.str() );
+    }
+
+    // minDisp and maxDisp.
+    if ( minDisp <= 0 )
+    {
+        EXCEPTION_BAD_ARGUMENT(minDisp, "minDisp must be a positive number.");
+    }
+
+    if ( maxDisp >= refMat.cols )
+    {
+        EXCEPTION_BAD_ARGUMENT(maxDisp, "maxDisp must be smaller than the width of image.");
+    }
+
+    if ( minDisp >= maxDisp )
+    {
+        EXCEPTION_BASE("minDisp should be smaller than maxDisp.");
+    }
+
+    // pMC cannot be NULL.
+    if ( NULL == pMC )
+    {
+        EXCEPTION_BAD_ARGUMENT( pMC, "NULL pointer found." );
+    }
+
+    // === Initial check done. ===
+
+    const int numDisp = maxDisp - minDisp;
+    const int pixels  = refMat.cols - minDisp;
+
+    // === Pre-allocation of weights. ===
+    const int nC     = pixels * numDisp;
+    FM_t* wcArrayRef = new FM_t[pixels];
+    FM_t* wcArrayTst = new FM_t[pixels];
+
+    // === Calculate color weights for all valid pixels. ===
+
+    int idxRef = minDisp, idxTst = 0;
+    Mat windowRef, windowTst;
+    Range rowRange( rowIdx - halfCount, rowIdx + halfCount + 1 );
+
+    // Buffers.
+    Mat bufferS( mWindowWidth, mWindowWidth, OCV_F_TYPE );
+    Mat bufferK( mNumKernels,  mNumKernels,  OCV_F_TYPE );
+
+    for ( int i = 0; i < pixels; ++i )
+    {
+        // Update the ROIs in refMat and tstMat.
+        Range colRangeRef( idxRef - halfCount, idxRef + halfCount + 1 );
+        Range colRangeTst( idxTst - halfCount, idxTst + halfCount + 1 );
+
+        windowRef = refMat( rowRange, colRangeRef );
+        windowTst = tstMat( rowRange, colRangeTst );
+
+        // Allocate memory for the current color weight matrix.
+        wcArrayRef[i] = FM_t::Zero( mWindowWidth, mWindowWidth );
+        wcArrayTst[i] = FM_t::Zero( mWindowWidth, mWindowWidth );
+
+        // Calculate weight matrix.
+        put_wc( windowRef, wcArrayRef[i], &bufferS, &bufferK );
+        put_wc( windowTst, wcArrayTst[i], &bufferS, &bufferK );
+
+        // Update indices.
+        idxRef++;
+        idxTst++;
+    }
+
+    FM_t tad( mWindowWidth, mWindowWidth );
+
+    // === Calculate the cost. ===
+    for ( int i = 0; i < pixels; ++i )
+    {
+        idxRef = minDisp + i;
+
+        for ( int j = 0; j < numDisp; ++j )
+        {
+            // Do not allocate new memory for MachingCost objects.
+            // These objects should be already allocated outside to boost
+            // the overall performance.
+
+            idxTst = idxRef - j - 1;
+
+            if ( idxTst < 0 )
+            {
+                break;
+            }
+            
+            // Update the ROIs in refMat and tstMat.
+            Range colRangeRef( idxRef - halfCount, idxRef + halfCount + 1 );
+            Range colRangeTst( idxTst - halfCount, idxTst + halfCount + 1 );
+
+            // Calculate the TAD over all the pixels of windowRef and windowTst.
+        }
+
+        idxRef++;
+    }
+
+    // Release resources.
+    delete [] wcArrayTst; wcArrayTst = NULL;
+    delete [] wcArrayRef; wcArrayRef = NULL;
 }

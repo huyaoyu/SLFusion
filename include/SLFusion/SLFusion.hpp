@@ -16,6 +16,8 @@
 #include <boost/exception/all.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include <gtest/gtest.h>
+
 #include "opencv2/core.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
@@ -101,6 +103,34 @@ private:
     cv::Mat mLIDARMap;
 
     cv::Mat mD;           // Disparity map.
+
+public:
+    friend class Test_SLFusion;
+    FRIEND_TEST(Test_SLFusion, OneLineStereoCost);
+};
+
+class Test_SLFusion : public ::testing::Test
+{
+protected:
+    static void SetUpTestCase()
+    {
+        
+    }
+
+    static void TearDownTestCase()
+    {
+        
+    }
+
+    virtual void SetUp()
+    {
+        
+    }
+
+    virtual void TearDown()
+    {
+        
+    }
 };
 
 }

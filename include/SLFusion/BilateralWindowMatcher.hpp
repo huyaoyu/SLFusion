@@ -20,6 +20,80 @@ using namespace Eigen;
 namespace slf
 {
 
+template<typename _T>
+class MatchingCost
+{
+public:
+    MatchingCost()
+    : mIdxRef(-1), mNTst(0), mIdxTstArray(NULL), mCostArray(NULL)
+    {
+
+    }
+
+    ~MatchingCost()
+    {
+        destory();
+    }
+
+    void destory(void)
+    {
+        if ( NULL != mCostArray )
+        {
+            delete [] mCostArray; mCostArray = NULL;
+        }
+
+        if ( NULL != mIdxTstArray )
+        {
+            delete [] mIdxTstArray; mIdxTstArray = NULL;
+        }
+
+        mNTst = 0;
+    }
+
+    void allocate(int n)
+    {
+        if ( n != mNTst )
+        {
+            destory();
+            mNTst = n;
+        }
+        
+        mIdxTstArray = new int[mNTst];
+        mCostArray   = new _T[mNTst];
+    }
+
+    void set_idx_ref(int idx)
+    {
+        mIdxRef = idx;
+    }
+
+    int get_idx_ref(void) const
+    {
+        return mIdxRef;
+    }
+
+    int get_n_test(void) const
+    {
+        return mNTst;
+    }
+
+    int* get_p_idx_test(void) const
+    {
+        return mIdxTstArray;
+    }
+
+    _T* get_p_cost(void) const
+    {
+        return mCostArray;
+    }
+
+protected:
+    int  mIdxRef;
+    int  mNTst;
+    int* mIdxTstArray;
+    _T*  mCostArray;
+};
+
 class BilateralWindowMatcher
 {
 public:
@@ -44,6 +118,20 @@ public:
     void set_gamma_c(Real_t gc);
     Real_t get_gamma_c(void);
 
+    /**
+     * @param refMat Reference image (left).
+     * @param tstMat Test image (right).
+     * @param rosIdx Row index in refMat and tstMat to calculate the matching cost.
+     * @param minDisp Minimum disparity value.
+     * @param maxDisp Maximum disparity value.
+     * @param pMC Pointer to a pre-allocated array of MachingCost<Real_t> objects.
+     * @param nMC The number of MachingCost<Real_t> objects stored starting from pMC. nMC must be smaller than the capacity of pMC. Pass NULL if not interested.
+     */
+    void match_single_line(
+        const Mat& refMat, const Mat& tstMat, int rowIdx,
+        int minDisp, int maxDisp, 
+        MatchingCost<Real_t>* pMC, int* nMC = NULL);
+
 protected:
     /**
      * @param _src The dimension is (mKernelSize * mNumKernels)^2. _src is assumed to have data type CV_8UC1 or CV_8UC3.
@@ -57,6 +145,9 @@ protected:
      * @param bufferK A Mat buffer which has the size of the number of kernels alone sides of the support window.
      */
     void put_wc(const Mat& src, FMatrix_t& wc, Mat* bufferS = NULL, Mat* bufferK = NULL);
+
+    template<typename tR, typename tT> Real_t TAD( const tR* pr, const tT* pt, int channels );
+    void TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad);
 
 protected:
     int mKernelSize;
@@ -79,6 +170,8 @@ protected:
 
     Real_t mGammaS;
     Real_t mGammaC;
+
+    Real_t mTAD_T;
 
 public:
     friend class Test_BilateralWindowMatcher;
