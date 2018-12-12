@@ -47,71 +47,82 @@ TEST_F( Test_BilateralWindowMatcher, average_color_values )
 TEST_F( Test_BilateralWindowMatcher, put_wc_01 )
 {
     // Create an input Mat object with all its pixels equal Scalar::all(255).
-    int windowWidth = mBWM->get_window_width();
+    const int numKernels  = mBWM->get_num_kernels_single_side();
+    const int windowWidth = mBWM->get_window_width();
+
     Mat src( windowWidth, windowWidth, CV_8UC3 );
     src.setTo( Scalar::all( 255 ) );
 
-    int centerIdx = ( windowWidth - 1 ) / 2;
+    const int centerIdx = ( numKernels - 1 ) / 2;
 
     // Resulting matrix.
-    FM_t wc = FM_t( windowWidth, windowWidth );
+    FM_t wc = FM_t( numKernels, numKernels );
 
-    Mat bufferK( src.size(), mBWM->OCV_F_TYPE );
+    Mat bufferK( numKernels, numKernels, mBWM->OCV_F_TYPE );
 
     // Get the wc values.
-    mBWM->put_wc( src, wc, NULL, &bufferK );
+    mBWM->put_wc( src, wc, bufferK, NULL );
 
     // cout << "wc = " << endl << wc << endl;
 
     ASSERT_EQ( wc( 0, 0), 1 );
     ASSERT_EQ( wc( centerIdx, centerIdx), 1 );
-    ASSERT_EQ( wc( windowWidth - 1, windowWidth - 1), 1 );
+    ASSERT_EQ( wc( numKernels - 1, numKernels - 1), 1 );
 }
 
 TEST_F( Test_BilateralWindowMatcher, put_wc_02 )
 {
     // Create an input Mat object with all its pixels equal Scalar::all(255) except the center one.
-    int windowWidth = mBWM->get_window_width();
+    const int numKernels  = mBWM->get_num_kernels_single_side();
+    const int windowWidth = mBWM->get_window_width();
+
     Mat src( windowWidth, windowWidth, CV_8UC3 );
     src.setTo( Scalar::all( 255 ) );
 
-    int centerIdx = ( windowWidth - 1 ) / 2;
+    const int centerIdxSrc = ( windowWidth - 1 ) / 2;
+    const int centerIdx    = ( numKernels - 1 ) / 2;
 
-    ASSERT_EQ( centerIdx, 19 );
+    ASSERT_EQ( centerIdxSrc, 19 );
 
-    src.at<Vec3b>( centerIdx, centerIdx ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc, centerIdxSrc ) = Vec3b( 1, 1, 1 );
 
     // Resulting matrix.
-    FM_t wc = FM_t( windowWidth, windowWidth );
+    FM_t wc = FM_t( numKernels, numKernels );
 
-    Mat bufferK( src.size(), mBWM->OCV_F_TYPE );
+    Mat bufferK( numKernels, numKernels, mBWM->OCV_F_TYPE );
 
     // Get the wc values.
-    mBWM->put_wc( src, wc, NULL, &bufferK );
+    mBWM->put_wc( src, wc, bufferK, NULL );
+
+    // cout << "bufferK = " << endl << bufferK << endl;
 
     // cout << "wc = " << endl << wc << endl;
 
-    const R_t nonCenterValue = 4.930302754597667e-09;
+    const R_t nonCenterValue = 0.11939494898409;
     const R_t eps = 1e-5;
 
     ASSERT_LT( std::fabs( ( wc(0, 0) - nonCenterValue ) / nonCenterValue ), eps );
 
-    src.at<Vec3b>( centerIdx - 1, centerIdx - 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdx - 1, centerIdx - 0 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdx - 1, centerIdx + 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdx - 0, centerIdx - 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdx - 0, centerIdx + 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdx + 1, centerIdx - 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdx + 1, centerIdx - 0 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdx + 1, centerIdx + 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc - 0 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 0, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 0, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc - 0 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
 
     Mat bufferS( windowWidth, windowWidth, mBWM->OCV_F_TYPE );
 
-    mBWM->put_wc( src, wc, &bufferS, &bufferK );
+    mBWM->put_wc( src, wc, bufferK, &bufferS );
+
+    // cout << "wc = " << endl << wc << endl;
+
+    const R_t nonCenterValue2 = 4.930302754597667e-09;
 
     ASSERT_EQ( wc( centerIdx,     centerIdx     ), 1 );
-    ASSERT_EQ( wc( centerIdx - 1, centerIdx + 1 ), 1 );
-    ASSERT_EQ( wc( centerIdx + 1, centerIdx - 1 ), 1 );
+    ASSERT_LT( std::fabs( ( wc(centerIdx - 1, centerIdx + 1) - nonCenterValue2 ) / nonCenterValue2 ), eps );
+    ASSERT_LT( std::fabs( ( wc(centerIdx + 1, centerIdx - 1) - nonCenterValue2 ) / nonCenterValue2 ), eps );
 }
 
 }

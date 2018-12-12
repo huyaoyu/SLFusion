@@ -142,9 +142,9 @@ protected:
     /**
      * @param src Data type is CV_8UC1 or CV_8UC3.
      * @param bufferS A Mat buffer which has the same height and width of the support window.
-     * @param bufferK A Mat buffer which has the size of the number of kernels alone sides of the support window.
+     * 
      */
-    void put_wc(const Mat& src, FMatrix_t& wc, Mat* bufferS = NULL, Mat* bufferK = NULL);
+    void put_wc(const Mat& src, FMatrix_t& wc, Mat& avgColor, Mat* bufferS = NULL);
 
     template<typename tR, typename tT> Real_t TAD( const tR* pr, const tT* pt, int channels );
     void TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad);

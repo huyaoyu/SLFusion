@@ -364,10 +364,10 @@ void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArr
     dst /= mKernelSize * mKernelSize;
 }
 
-void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat* bufferS, Mat* bufferK)
+void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat& avgColor, Mat* bufferS)
 {
     // To see if we have external buffer provided.
-    bool tempBufferS = false, tempBufferK = false;
+    bool tempBufferS = false;
 
     if ( NULL == bufferS )
     {
@@ -376,56 +376,42 @@ void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat* bufferS,
         tempBufferS = true;
     }
 
-    if ( NULL == bufferK )
-    {
-        // Overwite the input argument!
-        bufferK = new Mat( mNumKernels, mNumKernels, OCV_F_TYPE );
-        tempBufferK = true;
-    }
-
     // Calculate the average color values.
-    put_average_color_values( src, *bufferK );
+    put_average_color_values( src, avgColor );
 
     // NOTE: wc has to be row-major to maintain the performance.
-    const uchar*  pSrc   = NULL;
     Real_t* pAvgColorVal = NULL;
-    int kernelIndexRow   = 0, kernelIndexCol = 0;
     int pos              = 0;
-    int* const knlIdxRow = mKnlIdxRow.data();
-    int* const knlIdxCol = mKnlIdxCol.data();
+    int posCol           = 0;
     const int channels   = src.channels();
 
     Real_t colorDiff     = 0.0;
     Real_t colorDist     = 0.0; // Color distance. L2 distance.
 
-    uchar colorSrc[3]    = {0, 0, 0};
-    int centerIdx        = (mWindowWidth - 1) / 2;
+    Real_t colorSrc[3]   = {0.0, 0.0, 0.0};
+    int centerIdx        = (mNumKernels - 1) / 2;
 
     Real_t* pWC          = wc.data();
 
-    pSrc = src.ptr<uchar>(centerIdx);
+    pAvgColorVal = avgColor.ptr<Real_t>( centerIdx );
     for ( int i = 0; i < channels; ++i )
     {
-        colorSrc[i] = *( pSrc + centerIdx*channels + i );
+        colorSrc[i] = *( pAvgColorVal + centerIdx*channels + i );
     }
 
-    for ( int i = 0; i < src.rows; ++i )
+    for ( int i = 0; i < avgColor.rows; ++i )
     {
-        pSrc = src.ptr<uchar>( i );
-
-        kernelIndexRow = *( knlIdxRow + pos );
-        pAvgColorVal   = bufferK->ptr<Real_t>( kernelIndexRow );
-
-        for ( int j = 0; j < src.cols; ++j )
+        pAvgColorVal = avgColor.ptr<Real_t>( i );
+        posCol       = 0;
+        
+        for ( int j = 0; j < avgColor.cols; ++j )
         {
-            kernelIndexCol = *( knlIdxCol + pos );
-
             colorDist = 0.0;
 
             for ( int k = 0; k < channels; ++k )
             {
                 colorDiff = 
-                    colorSrc[k] - *( pAvgColorVal + kernelIndexCol*channels + k );
+                    colorSrc[k] - *( pAvgColorVal + posCol + k );
                 
                 colorDist += colorDiff * colorDiff;
             }
@@ -434,16 +420,12 @@ void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat* bufferS,
 
             *( pWC + pos ) = std::exp( -colorDist / mGammaC );
 
+            posCol += channels;
             pos++;
         }
     }
 
     // Release the memory.
-    if ( true == tempBufferK )
-    {
-        delete bufferK; bufferK = NULL;
-    }
-
     if ( true == tempBufferS )
     {
         delete bufferS; bufferS = NULL;
@@ -501,6 +483,7 @@ void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad
 
             *(tad.data() + posTad) = std::min( std::sqrt(temp), mTAD_T );
 
+            posTad++;
             posCol += channels;
         }
     }
@@ -521,6 +504,11 @@ void BilateralWindowMatcher::match_single_line(
         ssTst << "( " << tstMat.cols << ", " << tstMat.rows << " )";
 
         EXCEPTION_DIMENSION_MISMATCH(refMat, ssRef.str(), tstMat, ssTst.str());
+    }
+
+    if ( refMat.cols <= mWindowWidth + minDisp )
+    {
+        EXCEPTION_BAD_ARGUMENT( refMat, "Not enough columns." );
     }
 
     int halfCount = (mWindowWidth - 1) / 2;
@@ -565,22 +553,25 @@ void BilateralWindowMatcher::match_single_line(
     // === Initial check done. ===
 
     const int numDisp = maxDisp - minDisp;
-    const int pixels  = refMat.cols - minDisp;
+    const int pixels  = refMat.cols - minDisp - halfCount * 2;
 
     // === Pre-allocation of weights. ===
     const int nC     = pixels * numDisp;
     FM_t* wcArrayRef = new FM_t[pixels];
     FM_t* wcArrayTst = new FM_t[pixels];
 
+    // == Pre-allocation of average color. ===
+    Mat* avgColorArrayRef = new Mat[pixels];
+    Mat* avgColorArrayTst = new Mat[pixels];
+
     // === Calculate color weights for all valid pixels. ===
 
-    int idxRef = minDisp, idxTst = 0;
+    int idxRef = minDisp + halfCount, idxTst = halfCount;
     Mat windowRef, windowTst;
     Range rowRange( rowIdx - halfCount, rowIdx + halfCount + 1 );
 
     // Buffers.
     Mat bufferS( mWindowWidth, mWindowWidth, OCV_F_TYPE );
-    Mat bufferK( mNumKernels,  mNumKernels,  OCV_F_TYPE );
 
     for ( int i = 0; i < pixels; ++i )
     {
@@ -592,23 +583,28 @@ void BilateralWindowMatcher::match_single_line(
         windowTst = tstMat( rowRange, colRangeTst );
 
         // Allocate memory for the current color weight matrix.
-        wcArrayRef[i] = FM_t::Zero( mWindowWidth, mWindowWidth );
-        wcArrayTst[i] = FM_t::Zero( mWindowWidth, mWindowWidth );
+        wcArrayRef[i] = FM_t::Zero( mNumKernels, mNumKernels );
+        wcArrayTst[i] = FM_t::Zero( mNumKernels, mNumKernels );
 
         // Calculate weight matrix.
-        put_wc( windowRef, wcArrayRef[i], &bufferS, &bufferK );
-        put_wc( windowTst, wcArrayTst[i], &bufferS, &bufferK );
+        // avgColorArrayRef[i].create( mNumKernels, mNumKernels,  );
+        // avgColorArrayTst[i].create( mNumKernels, mNumKernels,  );
+        // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside put_wc().
+        put_wc( windowRef, wcArrayRef[i], avgColorArrayRef[i], &bufferS );
+        put_wc( windowTst, wcArrayTst[i], avgColorArrayTst[i], &bufferS );
 
         // Update indices.
         idxRef++;
         idxTst++;
     }
 
-    FM_t tad( mWindowWidth, mWindowWidth );
+    FM_t tad( mNumKernels, mNumKernels );
+    int idxAvgColorArrayTst = 0;
 
     // === Calculate the cost. ===
     for ( int i = 0; i < pixels; ++i )
     {
+        // The index in the original image.
         idxRef = minDisp + i;
 
         for ( int j = 0; j < numDisp; ++j )
@@ -617,24 +613,28 @@ void BilateralWindowMatcher::match_single_line(
             // These objects should be already allocated outside to boost
             // the overall performance.
 
-            idxTst = idxRef - j - 1;
+            // The index in avgColorArrayTst.
+            idxAvgColorArrayTst = i - j;
 
-            if ( idxTst < 0 )
+            if ( idxAvgColorArrayTst < 0 )
             {
                 break;
             }
-            
-            // Update the ROIs in refMat and tstMat.
-            Range colRangeRef( idxRef - halfCount, idxRef + halfCount + 1 );
-            Range colRangeTst( idxTst - halfCount, idxTst + halfCount + 1 );
 
-            // Calculate the TAD over all the pixels of windowRef and windowTst.
+            // Calculate the TAD over all the kernel blocks of windowRef and windowTst.
+            TADm( avgColorArrayRef[i], avgColorArrayTst[idxAvgColorArrayTst], tad );
+
+            // Calculate the cost value.
+
+            // Save the cost value into pMC.
+
         }
-
-        idxRef++;
     }
 
     // Release resources.
+    delete [] avgColorArrayTst; avgColorArrayTst = NULL;
+    delete [] avgColorArrayRef; avgColorArrayRef = NULL;
+
     delete [] wcArrayTst; wcArrayTst = NULL;
     delete [] wcArrayRef; wcArrayRef = NULL;
 }
