@@ -25,7 +25,8 @@ class MatchingCost
 {
 public:
     MatchingCost()
-    : mIdxRef(-1), mNTst(0), mIdxTstArray(NULL), mCostArray(NULL)
+    : mIdxRef(-1), mSize(0), mNTst(0), mDispArray(NULL), mCostArray(NULL),
+      mDataUnit( sizeof(int) + sizeof(_T) )
     {
 
     }
@@ -42,24 +43,42 @@ public:
             delete [] mCostArray; mCostArray = NULL;
         }
 
-        if ( NULL != mIdxTstArray )
+        if ( NULL != mDispArray )
         {
-            delete [] mIdxTstArray; mIdxTstArray = NULL;
+            delete [] mDispArray; mDispArray = NULL;
         }
 
         mNTst = 0;
+        mSize = 0;
     }
 
     void allocate(int n)
     {
-        if ( n != mNTst )
+        if ( n != mSize )
         {
             destory();
-            mNTst = n;
+            mSize = n;
         }
         
-        mIdxTstArray = new int[mNTst];
-        mCostArray   = new _T[mNTst];
+        mDispArray = new int[mNTst];
+        mCostArray = new _T[mNTst];
+    }
+
+    void push_back(int idxTst, _T cost)
+    {
+        if ( mNTst == mSize )
+        {
+            EXCEPTION_BASE("MatchingCost object reach maximum capacity.");
+        }
+
+        mDispArray[mNTst] = idxTst;
+        mCostArray[mNTst] = cost;
+        mNTst++;
+    }
+
+    int estimate_storage(void)
+    {
+        return mDataUnit * mSize;
     }
 
     void set_idx_ref(int idx)
@@ -72,6 +91,11 @@ public:
         return mIdxRef;
     }
 
+    int siez(void) const
+    {
+        return mSize;
+    }
+
     int get_n_test(void) const
     {
         return mNTst;
@@ -79,7 +103,7 @@ public:
 
     int* get_p_idx_test(void) const
     {
-        return mIdxTstArray;
+        return mDispArray;
     }
 
     _T* get_p_cost(void) const
@@ -89,9 +113,12 @@ public:
 
 protected:
     int  mIdxRef;
+    int  mSize;
     int  mNTst;
-    int* mIdxTstArray;
+    int* mDispArray;
     _T*  mCostArray;
+
+    const int  mDataUnit;
 };
 
 class BilateralWindowMatcher
@@ -165,6 +192,7 @@ protected:
 
     FMatrix_t mDistanceMap; // A 2D map. Each element of this map records its distance from the center of the window.
     FMatrix_t mWsMap;
+    FMatrix_t mWss; // Square of spacial weights.
 
     FMatrix_t mPntDistKnl; // A small 2D matrix. Each element of this matrix is the referenced distance from a kernel center to the window center.
 
@@ -178,6 +206,7 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, average_color_values);
     FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_01);
     FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_02);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_01);
 };
 
 class Test_BilateralWindowMatcher : public ::testing::Test

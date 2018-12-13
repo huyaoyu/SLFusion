@@ -195,13 +195,14 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
     mIndexMapCol  = IMatrix_t(mWindowWidth, mWindowWidth);
     mKnlIdxRow    = IMatrix_t(mWindowWidth, mWindowWidth);
     mKnlIdxCol    = IMatrix_t(mWindowWidth, mWindowWidth);
-    mPntIdxKnlRow = IMatrix_t(nw, nw);
-    mPntIdxKnlCol = IMatrix_t(nw, nw);
+    mPntIdxKnlRow = IMatrix_t(mNumKernels, mNumKernels);
+    mPntIdxKnlCol = IMatrix_t(mNumKernels, mNumKernels);
 
     mDistanceMap = FMatrix_t(mWindowWidth, mWindowWidth);
     mWsMap       = FMatrix_t(mWindowWidth, mWindowWidth);
+    mWss         = FMatrix_t(mNumKernels, mNumKernels);
 
-    mPntDistKnl  = FMatrix_t(nw, nw);
+    mPntDistKnl  = FMatrix_t(mNumKernels, mNumKernels);
 
     // Put index maps.
     put_index_map( mIndexMapRow, mIndexMapCol, mKnlIdxRow, mKnlIdxCol, mPntIdxKnlRow, mPntIdxKnlCol, w );
@@ -222,6 +223,9 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
             mPntDistKnl( i, j ) = mDistanceMap( idxRow, idxCol );
         }
     }
+
+    // Calculate mWss.
+    mWss = (mPntDistKnl.array() / (-mGammaS)).exp().square().matrix();
 }
 
 BilateralWindowMatcher::~BilateralWindowMatcher()
@@ -260,6 +264,9 @@ void BilateralWindowMatcher::show_index_maps(void)
 
     std::cout << "Ws map: " << std::endl;
     std::cout << mWsMap << std::endl;
+
+    std::cout << "Wss: " << std::endl;
+    std::cout << mWss << std::endl;
 }
 
 int BilateralWindowMatcher::get_kernel_size(void)
@@ -599,13 +606,17 @@ void BilateralWindowMatcher::match_single_line(
     }
 
     FM_t tad( mNumKernels, mNumKernels );
-    int idxAvgColorArrayTst = 0;
+    int idxAvgColorArrayTst = 0; // The index for avgColorArrayTst.
+    FM_t tempDenominatorMatrix;
+    R_t  tempCost = 0.0;
 
     // === Calculate the cost. ===
     for ( int i = 0; i < pixels; ++i )
     {
         // The index in the original image.
-        idxRef = minDisp + i;
+        idxRef = halfCount + minDisp + i;
+
+        pMC[i].set_idx_ref( idxRef );
 
         for ( int j = 0; j < numDisp; ++j )
         {
@@ -625,11 +636,22 @@ void BilateralWindowMatcher::match_single_line(
             TADm( avgColorArrayRef[i], avgColorArrayTst[idxAvgColorArrayTst], tad );
 
             // Calculate the cost value.
+            tempDenominatorMatrix = ( mWss.array() * wcArrayRef[i].array() * wcArrayTst[i].array() ).matrix();
+
+            tempCost = 
+                ( tempDenominatorMatrix.array() * tad.array() ).sum() / 
+                tempDenominatorMatrix.sum();
 
             // Save the cost value into pMC.
-
+            pMC[i].push_back( j + 1, tempCost );
         }
+
+        // Debug.
+        std::cout << "i = " << i << std::endl;
     }
+
+    // Debug.
+    std::cout << "Costs calculated." << std::endl;
 
     // Release resources.
     delete [] avgColorArrayTst; avgColorArrayTst = NULL;

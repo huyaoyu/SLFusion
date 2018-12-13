@@ -1,8 +1,12 @@
+#include <exception>
 #include <iostream>
+#include <string>
 
+#include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
 #include "SLFusion/BilateralWindowMatcher.hpp"
+#include "SLFusion/SLFusion.hpp"
 
 using namespace cv;
 using namespace Eigen;
@@ -123,6 +127,59 @@ TEST_F( Test_BilateralWindowMatcher, put_wc_02 )
     ASSERT_EQ( wc( centerIdx,     centerIdx     ), 1 );
     ASSERT_LT( std::fabs( ( wc(centerIdx - 1, centerIdx + 1) - nonCenterValue2 ) / nonCenterValue2 ), eps );
     ASSERT_LT( std::fabs( ( wc(centerIdx + 1, centerIdx - 1) - nonCenterValue2 ) / nonCenterValue2 ), eps );
+}
+
+TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
+{
+    using namespace std;
+
+    // Read 1 image.
+    string fn = "../data/SLFusion/L.jpg";
+    Mat img;
+
+    try
+    {
+        img = imread( fn, cv::IMREAD_COLOR );
+
+        cout << fn << " is read." << endl 
+             << "img.rows = " << img.rows << ", "
+             << "img.cols = " << img.cols 
+             << endl;
+        
+        // Padding.
+        Mat padded;
+        Scalar s = Scalar(0, 0, 0);
+        if ( 0 != Run_SLFusion::put_padded_mat( img, 3, 13, s, padded) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        // Define the disparity range.
+        const int minDisparity = 500;
+        const int maxDisparity = 999;
+        const int numDisparity = maxDisparity - minDisparity + 1;
+        const int pixels       = img.cols - minDisparity - 38;
+
+        // Pre-allocations.
+        MatchingCost<R_t>* mcArray = new MatchingCost<R_t>[ pixels ];
+        for ( int i = 0; i < pixels; ++i )
+        {
+            mcArray[i].allocate(numDisparity);
+        }
+
+        cout << "Estimated memory: " << mcArray[0].estimate_storage() * (pixels) / 1024.0 / 1024 << " MB." << endl;
+
+        // Use this only image as both the reference and test images.
+        // Calculate matching cost.
+        mBWM->match_single_line( img, img, 19, minDisparity, maxDisparity, mcArray);
+
+        // Verify the matching cost.
+    }
+    catch ( exception& exp )
+    {
+        cout << "wat() " << exp.what() << endl;
+        ASSERT_FALSE(true);
+    }
 }
 
 }

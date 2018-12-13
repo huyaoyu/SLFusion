@@ -163,8 +163,8 @@ get_r_by_angle(Run_SLFusion::real angle)
  * \return 0 for success, non-zero for error.
  * 
  */
-static int
-put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst)
+int
+Run_SLFusion::put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst)
 {
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
