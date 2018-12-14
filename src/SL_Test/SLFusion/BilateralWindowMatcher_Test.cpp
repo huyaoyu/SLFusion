@@ -136,6 +136,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
     // Read 1 image.
     string fn = "../data/SLFusion/L.jpg";
     Mat img;
+    const int kernelSize = 3;
+    const int numKernels = 13;
 
     try
     {
@@ -149,16 +151,20 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
         // Padding.
         Mat padded;
         Scalar s = Scalar(0, 0, 0);
-        if ( 0 != Run_SLFusion::put_padded_mat( img, 3, 13, s, padded) )
+        if ( 0 != Run_SLFusion::put_padded_mat( img, kernelSize, numKernels, s, padded) )
         {
             ASSERT_FALSE(true);
         }
+
+        cout << "Size of padded: (" << padded.rows << ", " << padded.cols << ")" << endl;
 
         // Define the disparity range.
         const int minDisparity = 500;
         const int maxDisparity = 999;
         const int numDisparity = maxDisparity - minDisparity + 1;
-        const int pixels       = img.cols - minDisparity - 38;
+        const int pixels       = img.cols - minDisparity - ( kernelSize * numKernels - 1 );
+
+        cout << "pixels = " << pixels << endl;
 
         // Pre-allocations.
         MatchingCost<R_t>* mcArray = new MatchingCost<R_t>[ pixels ];
@@ -171,7 +177,7 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
 
         // Use this only image as both the reference and test images.
         // Calculate matching cost.
-        mBWM->match_single_line( img, img, 19, minDisparity, maxDisparity, mcArray);
+        mBWM->match_single_line( img, img, ( kernelSize * numKernels - 1 )/2, minDisparity, maxDisparity, mcArray);
 
         // Verify the matching cost.
     }

@@ -60,8 +60,8 @@ public:
             mSize = n;
         }
         
-        mDispArray = new int[mNTst];
-        mCostArray = new _T[mNTst];
+        mDispArray = new int[mSize];
+        mCostArray = new _T[mSize];
     }
 
     void push_back(int idxTst, _T cost)

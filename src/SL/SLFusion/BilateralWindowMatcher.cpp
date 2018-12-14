@@ -636,7 +636,7 @@ void BilateralWindowMatcher::match_single_line(
             TADm( avgColorArrayRef[i], avgColorArrayTst[idxAvgColorArrayTst], tad );
 
             // Calculate the cost value.
-            tempDenominatorMatrix = ( mWss.array() * wcArrayRef[i].array() * wcArrayTst[i].array() ).matrix();
+            tempDenominatorMatrix = ( mWss.array() * wcArrayRef[i].array() * wcArrayTst[idxAvgColorArrayTst].array() ).matrix();
 
             tempCost = 
                 ( tempDenominatorMatrix.array() * tad.array() ).sum() / 
@@ -646,8 +646,8 @@ void BilateralWindowMatcher::match_single_line(
             pMC[i].push_back( j + 1, tempCost );
         }
 
-        // Debug.
-        std::cout << "i = " << i << std::endl;
+        // // Debug.
+        // std::cout << "i = " << i << std::endl;
     }
 
     // Debug.
