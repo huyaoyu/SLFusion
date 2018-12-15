@@ -2,6 +2,7 @@
 #ifndef __SLFUSION_BILATERALWINDOWMATCHER_HPP__
 #define __SLFUSION_BILATERALWINDOWMATCHER_HPP__
 
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -68,12 +69,18 @@ public:
     {
         if ( mNTst == mSize )
         {
-            EXCEPTION_BASE("MatchingCost object reach maximum capacity.");
+            std::cout << "MatchingCost object reaches the maximum capacity." << std::endl;
+            EXCEPTION_BASE("MatchingCost object reaches the maximum capacity.");
         }
 
         mDispArray[mNTst] = idxTst;
         mCostArray[mNTst] = cost;
         mNTst++;
+    }
+
+    void reset(void)
+    {
+        mNTst = 0;
     }
 
     int estimate_storage(void)
@@ -101,7 +108,7 @@ public:
         return mNTst;
     }
 
-    int* get_p_idx_test(void) const
+    int* get_disparity_array(void) const
     {
         return mDispArray;
     }
@@ -109,6 +116,28 @@ public:
     _T* get_p_cost(void) const
     {
         return mCostArray;
+    }
+
+    /**
+     * @param dn The directory name.
+     */
+    void write(const std::string& dn)
+    {
+        // Filename.
+        std::stringstream ss;
+        ss.str(""); ss.clear();
+        ss << dn << "/" << mIdxRef << ".dat";
+
+        std::ofstream ofs;
+        ofs.open( ss.str() );
+
+        ofs.precision(12);
+        for ( int i = 0; i < mNTst; ++i )
+        {
+            ofs << std::showpos << std::scientific << mDispArray[i] << " " << mCostArray[i] << std::endl;
+        }
+
+        ofs.close();
     }
 
 protected:
@@ -159,6 +188,15 @@ public:
         int minDisp, int maxDisp, 
         MatchingCost<Real_t>* pMC, int* nMC = NULL);
 
+    /**
+     * @return Buffer size is returned as number of bytes. 
+     */
+    size_t get_internal_buffer_szie(void);
+
+    void enable_debug(void);
+    void disable_debug(void);
+    void debug_set_array_buffer_idx(size_t idx);
+
 protected:
     /**
      * @param _src The dimension is (mKernelSize * mNumKernels)^2. _src is assumed to have data type CV_8UC1 or CV_8UC3.
@@ -175,6 +213,18 @@ protected:
 
     template<typename tR, typename tT> Real_t TAD( const tR* pr, const tT* pt, int channels );
     void TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad);
+
+private:
+    /**
+     * If size <= mABSize, the arrays will be re-used. If size > mABSize, the
+     * array buffers will be deleted first and then allocated. Use argument force to
+     * explicitly delete and allocated new memory. Newly allocated memory is NOT
+     * initialized. If Argument size == 0, then the arrya buffers will be deleted and no
+     * new memory will be allocated.
+     */
+    void create_array_buffer(size_t size, int matType, bool force = false);
+    void destroy_array_buffer(void);
+    void allocate_array_buffer(size_t size, int matType);
 
 protected:
     int mKernelSize;
@@ -201,12 +251,24 @@ protected:
 
     Real_t mTAD_T;
 
+private:
+    Mat*       mACArrayRef; // AC means average color.
+    Mat*       mACArrayTst;
+    FMatrix_t* mWCArrayRef; // WC means color weights.
+    FMatrix_t* mWCArrayTst;
+    size_t     mABSize;     // AB means array buffer.
+    size_t     mABMemorySize; // The memory of all array buffers in bytes.
+
+    bool mFlagDebug;
+    size_t mDebug_ABIdx;
+
 public:
     friend class Test_BilateralWindowMatcher;
     FRIEND_TEST(Test_BilateralWindowMatcher, average_color_values);
     FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_01);
     FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_02);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_01);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_02);
 };
 
 class Test_BilateralWindowMatcher : public ::testing::Test

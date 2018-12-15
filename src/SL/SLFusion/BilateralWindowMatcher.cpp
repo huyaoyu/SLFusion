@@ -170,7 +170,10 @@ put_Ws_map( const FM_t& distanceMap, double gs, FM_t& Ws)
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 : OCV_F_TYPE(CV_32FC1),
-  mGammaS(14), mGammaC(23), mTAD_T(100)
+  mGammaS(14), mGammaC(23), mTAD_T(100),
+  mACArrayRef(NULL), mACArrayTst(NULL), mWCArrayRef(NULL), mWCArrayTst(NULL), mABSize(0),
+  mABMemorySize(0),
+  mFlagDebug(false), mDebug_ABIdx(0)
 {
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
@@ -230,7 +233,7 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 
 BilateralWindowMatcher::~BilateralWindowMatcher()
 {
-
+    destroy_array_buffer();
 }
 
 void BilateralWindowMatcher::show_index_maps(void)
@@ -496,6 +499,131 @@ void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad
     }
 }
 
+void BilateralWindowMatcher::destroy_array_buffer(void)
+{
+    delete [] mWCArrayTst; mWCArrayTst = NULL; // Delete a NULL pointer won't cause problem.
+    delete [] mWCArrayRef; mWCArrayRef = NULL;
+    delete [] mACArrayTst; mACArrayTst = NULL;
+    delete [] mACArrayRef; mACArrayRef = NULL;
+}
+
+static void 
+create_mat_array(Mat* array, size_t size, int row, int col, int type)
+{
+    for ( size_t i = 0; i < size; ++i )
+    {
+        array[i].create( row, col, type );
+    }
+}
+
+template<typename _T>
+static void 
+create_matrix_array(_T* array, size_t size, int row, int col)
+{
+    for ( size_t i = 0; i < size; ++i )
+    {
+        array[i] = _T::Zero( row, col );
+    }
+}
+
+void BilateralWindowMatcher::allocate_array_buffer(size_t size, int matType)
+{
+    size_t sizeOfMatEle = 0;
+    switch (matType)
+    {
+        case CV_32FC1:
+        {
+            sizeOfMatEle = sizeof(float);
+            break;
+        }
+        case CV_32FC3:
+        {
+            sizeOfMatEle = sizeof(float) * 3;
+            break;
+        }
+        case CV_64FC1:
+        {
+            sizeOfMatEle = sizeof(double);
+            break;
+        }
+        case CV_64FC3:
+        {
+            sizeOfMatEle = sizeof(double) * 3;
+            break;
+        }
+        case CV_8UC1:
+        {
+            sizeOfMatEle = sizeof(uchar);
+            break;
+        }
+        case CV_8UC3:
+        {
+            sizeOfMatEle = sizeof(uchar) * 3;
+            break;
+        }
+        default:
+        {
+            // This should be an error.
+            EXCEPTION_BAD_ARGUMENT(matType, "Unexpected matType,");
+        }
+    }
+
+    mACArrayRef = new Mat[size];
+    create_mat_array( mACArrayRef, size, mNumKernels, mNumKernels, matType );
+    mACArrayTst = new Mat[size];
+    create_mat_array( mACArrayTst, size, mNumKernels, mNumKernels, matType );
+
+    mWCArrayRef = new FM_t[size];
+    create_matrix_array( mWCArrayRef, size, mNumKernels, mNumKernels );
+    mWCArrayTst = new FM_t[size];
+    create_matrix_array( mWCArrayTst, size, mNumKernels, mNumKernels );
+
+    mABMemorySize = ( sizeOfMatEle + sizeof(R_t) ) * mNumKernels * mNumKernels * size;
+}
+
+size_t BilateralWindowMatcher::get_internal_buffer_szie(void)
+{
+    return mABMemorySize;
+}
+
+void BilateralWindowMatcher::enable_debug(void)
+{
+    mFlagDebug = true;
+}
+
+void BilateralWindowMatcher::disable_debug(void)
+{
+    mFlagDebug = false;
+}
+
+void BilateralWindowMatcher::debug_set_array_buffer_idx(size_t idx)
+{
+    mDebug_ABIdx = idx;
+}
+
+void BilateralWindowMatcher::create_array_buffer(size_t size, int matType, bool force)
+{
+    if ( size > mABSize )
+    {
+        destroy_array_buffer();
+        allocate_array_buffer(size, matType);
+    }
+    else if ( size == 0 )
+    {
+        destroy_array_buffer();
+    }
+    else if ( size <= mABSize )
+    {
+        if ( true == force )
+        {
+            destroy_array_buffer();
+            allocate_array_buffer(size, matType);
+        }
+    }
+
+    mABSize = size;
+}
+
 void BilateralWindowMatcher::match_single_line(
         const Mat& refMat, const Mat& tstMat, int rowIdx,
         int minDisp, int maxDisp, 
@@ -559,17 +687,14 @@ void BilateralWindowMatcher::match_single_line(
 
     // === Initial check done. ===
 
-    const int numDisp = maxDisp - minDisp;
+    const int numDisp = maxDisp - minDisp + 1;
     const int pixels  = refMat.cols - minDisp - halfCount * 2;
 
-    // === Pre-allocation of weights. ===
-    const int nC     = pixels * numDisp;
-    FM_t* wcArrayRef = new FM_t[pixels];
-    FM_t* wcArrayTst = new FM_t[pixels];
+    const int nC      = pixels * numDisp;
 
+    // === Pre-allocation of weights. ===
     // == Pre-allocation of average color. ===
-    Mat* avgColorArrayRef = new Mat[pixels];
-    Mat* avgColorArrayTst = new Mat[pixels];
+    create_array_buffer(pixels, refMat.type());
 
     // === Calculate color weights for all valid pixels. ===
 
@@ -589,20 +714,22 @@ void BilateralWindowMatcher::match_single_line(
         windowRef = refMat( rowRange, colRangeRef );
         windowTst = tstMat( rowRange, colRangeTst );
 
-        // Allocate memory for the current color weight matrix.
-        wcArrayRef[i] = FM_t::Zero( mNumKernels, mNumKernels );
-        wcArrayTst[i] = FM_t::Zero( mNumKernels, mNumKernels );
-
         // Calculate weight matrix.
         // avgColorArrayRef[i].create( mNumKernels, mNumKernels,  );
         // avgColorArrayTst[i].create( mNumKernels, mNumKernels,  );
         // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside put_wc().
-        put_wc( windowRef, wcArrayRef[i], avgColorArrayRef[i], &bufferS );
-        put_wc( windowTst, wcArrayTst[i], avgColorArrayTst[i], &bufferS );
+        put_wc( windowRef, mWCArrayRef[i], mACArrayRef[i], &bufferS );
+        put_wc( windowTst, mWCArrayTst[i], mACArrayTst[i], &bufferS );
 
         // Update indices.
         idxRef++;
         idxTst++;
+    }
+
+    // Debug.
+    if ( true == mFlagDebug )
+    {
+        
     }
 
     FM_t tad( mNumKernels, mNumKernels );
@@ -633,17 +760,17 @@ void BilateralWindowMatcher::match_single_line(
             }
 
             // Calculate the TAD over all the kernel blocks of windowRef and windowTst.
-            TADm( avgColorArrayRef[i], avgColorArrayTst[idxAvgColorArrayTst], tad );
+            TADm( mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst], tad );
 
             // Calculate the cost value.
-            tempDenominatorMatrix = ( mWss.array() * wcArrayRef[i].array() * wcArrayTst[idxAvgColorArrayTst].array() ).matrix();
+            tempDenominatorMatrix = ( mWss.array() * mWCArrayRef[i].array() * mWCArrayTst[idxAvgColorArrayTst].array() ).matrix();
 
             tempCost = 
                 ( tempDenominatorMatrix.array() * tad.array() ).sum() / 
                 tempDenominatorMatrix.sum();
 
             // Save the cost value into pMC.
-            pMC[i].push_back( j + 1, tempCost );
+            pMC[i].push_back( minDisp + j, tempCost );
         }
 
         // // Debug.
@@ -652,11 +779,4 @@ void BilateralWindowMatcher::match_single_line(
 
     // Debug.
     std::cout << "Costs calculated." << std::endl;
-
-    // Release resources.
-    delete [] avgColorArrayTst; avgColorArrayTst = NULL;
-    delete [] avgColorArrayRef; avgColorArrayRef = NULL;
-
-    delete [] wcArrayTst; wcArrayTst = NULL;
-    delete [] wcArrayRef; wcArrayRef = NULL;
 }
