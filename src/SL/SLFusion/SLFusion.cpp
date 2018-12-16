@@ -164,7 +164,7 @@ get_r_by_angle(Run_SLFusion::real angle)
  * 
  */
 int
-Run_SLFusion::put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst)
+Run_SLFusion::put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst, cv::OutputArray _mask)
 {
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
@@ -191,8 +191,15 @@ Run_SLFusion::put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv
     _dst.create( src.rows + P * 2, src.cols + P * 2, src.type() );
 	cv::Mat dst = _dst.getMat();
 
+    _mask.create( src.rows + P * 2, src.cols + P * 2, CV_8UC1 );
+    cv::Mat mask = _mask.getMat();
+
     // Padding.
     cv::copyMakeBorder(src, dst, P, P, P, P, cv::BORDER_CONSTANT, spv);
+
+    // Create the mask.
+    mask.setTo( cv::Scalar::all(0) );
+    mask( cv::Rect( P, P, mask.cols - 2*P, mask.rows - 2*P ) ).setTo(cv::Scalar::all(255));
 
     return 0;
 }
@@ -551,15 +558,15 @@ Runnable::RES_t Run_SLFusion::run(void)
 		}
 
         // ================= Image padding. ==================
-        cv::Mat paddedImg[2];
+        cv::Mat paddedImg[2], paddedMask[2];
         cv::Scalar spv = cv::Scalar(0, 0, 0);
-        if ( 0 != put_padded_mat( mSrcImgs[0], 3, 13, spv, paddedImg[0] ) )
+        if ( 0 != put_padded_mat( mSrcImgs[0], 3, 13, spv, paddedImg[0], paddedMask[0] ) )
         {
             std::cout << "put_padded_mat failed." << std::endl;
             EXCEPTION_BASE( "put_padded_mat failed." );
         }
 
-        if ( 0 != put_padded_mat( mSrcImgs[1], 3, 13, spv, paddedImg[1] ) )
+        if ( 0 != put_padded_mat( mSrcImgs[1], 3, 13, spv, paddedImg[1], paddedMask[1] ) )
         {
             std::cout << "put_padded_mat failed." << std::endl;
             EXCEPTION_BASE( "put_padded_mat failed." );

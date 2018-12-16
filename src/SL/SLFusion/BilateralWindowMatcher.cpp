@@ -1,4 +1,8 @@
 #include <cmath>
+#include <fstream>
+#include <vector>
+
+#include <opencv2/highgui.hpp>
 
 #include "SLFusion/BilateralWindowMatcher.hpp"
 
@@ -170,7 +174,7 @@ put_Ws_map( const FM_t& distanceMap, double gs, FM_t& Ws)
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 : OCV_F_TYPE(CV_32FC1),
-  mGammaS(14), mGammaC(23), mTAD_T(100),
+  mGammaS(14), mGammaC(23), mTAD_T(255),
   mACArrayRef(NULL), mACArrayTst(NULL), mWCArrayRef(NULL), mWCArrayTst(NULL), mABSize(0),
   mABMemorySize(0),
   mFlagDebug(false), mDebug_ABIdx(0)
@@ -186,6 +190,15 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
     {
         std::cout << "nw should be a positive odd integer. nw = " << nw << "." << std::endl;
         EXCEPTION_BAD_ARGUMENT(nw, "A positive odd integer is expected.");
+    }
+
+    if ( w > 15 )
+    {
+        std::cout << "Currently the kernal size should be smaller than 15. w = " << w << "." << std::endl;
+        EXCEPTION_BAD_ARGUMENT(w, "w should be smaller than 15.");
+
+        // This is due to the mask mechanismt which is utilized in the process of calculating
+        // the average color inside a window. The counter for unmasked pixels is a unsigned char typed value.
     }
 
     mKernelSize = w;
@@ -309,7 +322,80 @@ BilateralWindowMatcher::get_gamma_c(void)
     return mGammaC;
 }
 
-void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArray _dst)
+template<typename _TN, typename _TD, typename _TT> 
+static void mat_divide(const Mat& n, const Mat& d, Mat& dst)
+{
+    if ( n.size() != d.size() )
+    {
+        std::cout << "Size mismatch." << std::endl;
+
+        std::stringstream ssN, ssD;
+
+        ssN << "n.size() = (" << n.rows << ", " << n.cols << ").";
+        ssD << "d.size() = (" << d.rows << ", " << d.cols << ").";
+
+        EXCEPTION_DIMENSION_MISMATCH( n, ssN.str(), d, ssD.str() );
+    }
+
+    if ( n.size() != dst.size() )
+    {
+        std::cout << "Size mismatch." << std::endl;
+
+        std::stringstream ssN, ssDst;
+
+        ssN   << "n.size() = (" << n.rows << ", " << n.cols << ").";
+        ssDst << "dst.size() = (" << d.rows << ", " << d.cols << ").";
+
+        EXCEPTION_DIMENSION_MISMATCH( n, ssN.str(), dst, ssDst.str() );
+    }
+
+    if ( n.channels() != dst.channels() )
+    {
+        std::cout << "Channels mismatch." << std::endl;
+
+        std::stringstream ssN, ssT;
+
+        ssN << "n.channels() = "   << n.channels() << ".";
+        ssT << "dst.channels() = " << dst.channels() << ".";
+
+        EXCEPTION_DIMENSION_MISMATCH( n, ssN.str(), dst, ssT.str() );
+    }
+
+    if ( d.channels() != 1 )
+    {
+        std::cout << "Currently only support d.channels() = 1." << std::endl;
+        EXCEPTION_BAD_ARGUMENT(d, "Currently only support d.channels() = 1."); 
+    }
+
+    const _TN* pN = NULL;
+    const _TD* pD = NULL;
+    _TT* pT = NULL;
+
+    const int channels = n.channels();
+    int posN = 0;
+
+    for ( int i = 0; i < n.rows; ++i )
+    {
+        pN = n.ptr<_TN>(i);
+        pD = d.ptr<_TD>(i);
+        pT = dst.ptr<_TT>(i);
+
+        posN = 0;
+
+        for ( int j = 0; j < n.cols; ++j )
+        {
+            for ( int k = 0; k < channels; ++k )
+            {
+                *(pT + posN + k) = *(pN + posN + k) / *(pD + j);
+            }
+
+            posN += channels;
+        }
+    }
+}
+
+void BilateralWindowMatcher::put_average_color_values( 
+    InputArray _src, OutputArray _dst, InputArray _mask, OutputArray _validCount, OutputArray _tempValidCount )
 {
     Mat src = _src.getMat();
     
@@ -348,6 +434,14 @@ void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArr
     int* const knlIdxRow = mKnlIdxRow.data();
     int* const knlIdxCol = mKnlIdxCol.data();
 
+    // Mask.
+    Mat mask = _mask.getMat();
+    uchar* pM = NULL;
+    _validCount.create( mNumKernels, mNumKernels, CV_8UC1 );
+    Mat validCount = _validCount.getMat();
+    validCount.setTo(Scalar::all(0));
+    uchar* pV = NULL;
+
     for ( int i = 0; i < src.rows; ++i )
     {
         pS = src.ptr<uchar>(i);
@@ -356,25 +450,54 @@ void BilateralWindowMatcher::put_average_color_values(InputArray _src, OutputArr
         kernelIndexRow = *( knlIdxRow + pos );
         pD = dst.ptr<float>( kernelIndexRow );
 
+        // Pointer to the mask.
+        pM = mask.ptr<uchar>(i);
+        pV = validCount.ptr<uchar>(kernelIndexRow);
+
         for ( int j = 0; j < src.cols; ++j )
         {
-            kernelIndexCol = *( knlIdxCol + pos );
-
-            for ( int k = 0; k < channels; ++k )
+            if ( 0 != *(pM + j) )
             {
-                (*( pD + kernelIndexCol * channels + k )) += 
-                (*( pS +              j * channels + k ));
+                kernelIndexCol = *( knlIdxCol + pos );
+
+                for ( int k = 0; k < channels; ++k )
+                {
+                    (*( pD + kernelIndexCol * channels + k )) += 
+                    (*( pS +              j * channels + k ));
+                }
+
+                *(pV + kernelIndexCol) += 1;
             }
 
             pos++;
         }
     }
 
+    _tempValidCount.create( mNumKernels, mNumKernels, CV_8UC1 );
+    Mat tempValidCount = _tempValidCount.getMat();
+    validCount.copyTo(tempValidCount);
+
+    for ( int i = 0; i < mNumKernels; ++i )
+    {
+        pV = tempValidCount.ptr<uchar>(i);
+
+        for ( int j = 0; j < mNumKernels; ++j )
+        {
+            if ( 0 == *(pV + j) )
+            {
+                *(pV + j) = 1;
+            }
+        }
+    }
+
     // Calculate the average.
-    dst /= mKernelSize * mKernelSize;
+    // dst /= tempValidCount;
+
+    mat_divide<R_t, uchar, R_t>(dst, tempValidCount, dst);
 }
 
-void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat& avgColor, Mat* bufferS)
+void BilateralWindowMatcher::put_wc(const Mat& src, const Mat& mask, 
+    FMatrix_t& wc, Mat& avgColor, Mat& vcMat, Mat& tvcMat, Mat* bufferS)
 {
     // To see if we have external buffer provided.
     bool tempBufferS = false;
@@ -387,7 +510,7 @@ void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat& avgColor
     }
 
     // Calculate the average color values.
-    put_average_color_values( src, avgColor );
+    put_average_color_values( src, avgColor, mask, vcMat, tvcMat );
 
     // NOTE: wc has to be row-major to maintain the performance.
     Real_t* pAvgColorVal = NULL;
@@ -403,6 +526,8 @@ void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat& avgColor
 
     Real_t* pWC          = wc.data();
 
+    uchar* pVC           = NULL;
+
     pAvgColorVal = avgColor.ptr<Real_t>( centerIdx );
     for ( int i = 0; i < channels; ++i )
     {
@@ -414,21 +539,30 @@ void BilateralWindowMatcher::put_wc(const Mat& src, FMatrix_t& wc, Mat& avgColor
         pAvgColorVal = avgColor.ptr<Real_t>( i );
         posCol       = 0;
         
+        pVC = vcMat.ptr<uchar>(i);
+
         for ( int j = 0; j < avgColor.cols; ++j )
         {
-            colorDist = 0.0;
-
-            for ( int k = 0; k < channels; ++k )
+            if ( 0 != *(pVC + j) )
             {
-                colorDiff = 
-                    colorSrc[k] - *( pAvgColorVal + posCol + k );
-                
-                colorDist += colorDiff * colorDiff;
+                colorDist = 0.0;
+
+                for ( int k = 0; k < channels; ++k )
+                {
+                    colorDiff = 
+                        colorSrc[k] - *( pAvgColorVal + posCol + k );
+                    
+                    colorDist += colorDiff * colorDiff;
+                }
+
+                colorDist = std::sqrt( colorDist );
+
+                *( pWC + pos ) = std::exp( -colorDist / mGammaC );
             }
-
-            colorDist = std::sqrt( colorDist );
-
-            *( pWC + pos ) = std::exp( -colorDist / mGammaC );
+            else
+            {
+                *( pWC + pos ) = 0.0;
+            }
 
             posCol += channels;
             pos++;
@@ -457,12 +591,13 @@ BilateralWindowMatcher::Real_t BilateralWindowMatcher::TAD( const tR* pr, const 
         );
 }
 
+template<typename _TR, typename _TT> 
 void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad)
 {
     // The rows and cols of ref and tst are assumed to be the same.
     const int channels = ref.channels();
-    const uchar* pRef  = NULL;
-    const uchar* pTst  = NULL;
+    const _TR* pRef  = NULL;
+    const _TT* pTst  = NULL;
 
     R_t temp = 0.0;
 
@@ -472,13 +607,18 @@ void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad
     for ( int i = 0; i < ref.rows; ++i )
     {
         // Get the pointer to the ref and tst.
-        pRef = ref.ptr<uchar>(i);
-        pTst = ref.ptr<uchar>(i);
+        pRef = ref.ptr<_TR>(i);
+        pTst = tst.ptr<_TT>(i);
 
         posCol = 0;
 
         for ( int j = 0; j < ref.cols; ++j )
         {
+            if ( i == ref.rows/2 && j == ref.cols/2 )
+            {
+                temp = 0.0;
+            }
+
             temp        = 0.0;
             posColShift = posCol;
 
@@ -625,10 +765,24 @@ void BilateralWindowMatcher::create_array_buffer(size_t size, int matType, bool 
 }
 
 void BilateralWindowMatcher::match_single_line(
-        const Mat& refMat, const Mat& tstMat, int rowIdx,
+        const Mat& refMat, const Mat& tstMat, 
+        const Mat& refMask, const Mat& tstMask, 
+        int rowIdx,
         int minDisp, int maxDisp, 
         MatchingCost<BilateralWindowMatcher::Real_t>* pMC, int* nMC )
 {
+    if ( true == mFlagDebug )
+    {
+        std::vector<int> jpegParams;
+        jpegParams.push_back(IMWRITE_JPEG_QUALITY);
+        jpegParams.push_back(100);
+
+        imwrite("refMat.jpg",   refMat, jpegParams);
+        imwrite("tstMat.jpg",   tstMat, jpegParams);
+        imwrite("refMask.jpg", refMask, jpegParams);
+        imwrite("tstMask.jpg", tstMask, jpegParams);
+    }
+
     // Expecting input images have the same width.
     if ( refMat.cols != tstMat.cols )
     {
@@ -639,6 +793,28 @@ void BilateralWindowMatcher::match_single_line(
         ssTst << "( " << tstMat.cols << ", " << tstMat.rows << " )";
 
         EXCEPTION_DIMENSION_MISMATCH(refMat, ssRef.str(), tstMat, ssTst.str());
+    }
+
+    if ( refMask.cols != tstMask.cols )
+    {
+        std::stringstream ssRef;
+        ssRef << "( " << refMask.cols << ", " << refMask.rows << " )";
+
+        std::stringstream ssTst;
+        ssTst << "( " << tstMask.cols << ", " << tstMask.rows << " )";
+
+        EXCEPTION_DIMENSION_MISMATCH(refMask, ssRef.str(), tstMask, ssTst.str());
+    }
+
+    if ( refMat.cols != refMask.cols )
+    {
+        std::stringstream ssRef;
+        ssRef << "( " << refMat.cols << ", " << refMat.rows << " )";
+
+        std::stringstream ssMask;
+        ssMask << "( " << refMask.cols << ", " << refMask.rows << " )";
+
+        EXCEPTION_DIMENSION_MISMATCH(refMat, ssRef.str(), refMask, ssMask.str());
     }
 
     if ( refMat.cols <= mWindowWidth + minDisp )
@@ -700,10 +876,15 @@ void BilateralWindowMatcher::match_single_line(
 
     int idxRef = minDisp + halfCount, idxTst = halfCount;
     Mat windowRef, windowTst;
+    Mat winMaskRef, winMaskTst;
     Range rowRange( rowIdx - halfCount, rowIdx + halfCount + 1 );
 
     // Buffers.
     Mat bufferS( mWindowWidth, mWindowWidth, OCV_F_TYPE );
+    Mat vcMatRef(  mNumKernels, mNumKernels, CV_8UC1 );
+    Mat vcMatTst(  mNumKernels, mNumKernels, CV_8UC1 );
+    Mat tvcMatRef( mNumKernels, mNumKernels, CV_8UC1 );
+    Mat tvcMatTst( mNumKernels, mNumKernels, CV_8UC1 );
 
     for ( int i = 0; i < pixels; ++i )
     {
@@ -714,22 +895,60 @@ void BilateralWindowMatcher::match_single_line(
         windowRef = refMat( rowRange, colRangeRef );
         windowTst = tstMat( rowRange, colRangeTst );
 
+        winMaskRef = refMask( rowRange, colRangeRef );
+        winMaskTst = tstMask( rowRange, colRangeTst );
+
         // Calculate weight matrix.
         // avgColorArrayRef[i].create( mNumKernels, mNumKernels,  );
         // avgColorArrayTst[i].create( mNumKernels, mNumKernels,  );
         // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside put_wc().
-        put_wc( windowRef, mWCArrayRef[i], mACArrayRef[i], &bufferS );
-        put_wc( windowTst, mWCArrayTst[i], mACArrayTst[i], &bufferS );
+        put_wc( windowRef, winMaskRef, mWCArrayRef[i], mACArrayRef[i], vcMatRef, tvcMatRef, &bufferS );
+        put_wc( windowTst, winMaskTst, mWCArrayTst[i], mACArrayTst[i], vcMatTst, tvcMatTst, &bufferS );
 
         // Update indices.
         idxRef++;
         idxTst++;
-    }
+    
+        // Debug.
+        if ( true == mFlagDebug )
+        {
+            if ( i == mDebug_ABIdx )
+            {
+                Mat channelsRef[3], channelsTst[3];
+                split( mACArrayRef[i], channelsRef );
+                split( mACArrayTst[i], channelsTst );
 
-    // Debug.
-    if ( true == mFlagDebug )
-    {
-        
+                FileStorage fs;
+                fs.open("mACArray.yml", FileStorage::WRITE);
+                fs << "i" << i
+                   << "refC0" << channelsRef[0]
+                   << "refC1" << channelsRef[1]
+                   << "refC2" << channelsRef[2]
+                   << "tstC0" << channelsTst[0]
+                   << "tstC1" << channelsTst[1]
+                   << "tstC2" << channelsTst[2]
+                   << "winMaskRef" << winMaskRef
+                   << "winMaskTst" << winMaskTst
+                   << "vcMatRef" << vcMatRef
+                   << "vcMatTst" << vcMatTst
+                   << "tvbMatRef" << tvcMatRef
+                   << "tvbMatTst" << tvcMatTst
+                   << "windowRef" << windowRef
+                   << "windowTst" << windowTst;
+
+                std::vector<int> jpegParams;
+                jpegParams.push_back(IMWRITE_JPEG_QUALITY);
+                jpegParams.push_back(100);
+
+                imwrite("windowsRef.jpg", windowRef, jpegParams);
+                imwrite("windowsTst.jpg", windowTst, jpegParams);
+
+                std::ofstream ofs;
+                ofs.open( "mWCArray.dat" );
+                ofs << mWCArrayRef[i] << std::endl << std::endl << mWCArrayTst[i];
+                ofs.close();
+            }
+        }
     }
 
     FM_t tad( mNumKernels, mNumKernels );
@@ -738,6 +957,7 @@ void BilateralWindowMatcher::match_single_line(
     R_t  tempCost = 0.0;
 
     // === Calculate the cost. ===
+    int debugCount = 0;
     for ( int i = 0; i < pixels; ++i )
     {
         // The index in the original image.
@@ -759,8 +979,16 @@ void BilateralWindowMatcher::match_single_line(
                 break;
             }
 
+            if ( true == mFlagDebug )
+            {
+                if ( i == mDebug_ABIdx && j == 0 )
+                {
+                    std::cout << "Debug." << std::endl;
+                }
+            }
+
             // Calculate the TAD over all the kernel blocks of windowRef and windowTst.
-            TADm( mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst], tad );
+            TADm<R_t, R_t>( mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst], tad );
 
             // Calculate the cost value.
             tempDenominatorMatrix = ( mWss.array() * mWCArrayRef[i].array() * mWCArrayTst[idxAvgColorArrayTst].array() ).matrix();
@@ -771,6 +999,37 @@ void BilateralWindowMatcher::match_single_line(
 
             // Save the cost value into pMC.
             pMC[i].push_back( minDisp + j, tempCost );
+
+            if ( true == mFlagDebug )
+            {
+                if ( i == mDebug_ABIdx && j == 0 )
+                {
+                    FileStorage fs;
+                    fs.open("mACArray_cost.yml", FileStorage::WRITE);
+                    fs << "i" << i
+                       << "ref" << mACArrayRef[i]
+                       << "tst" << mACArrayTst[idxAvgColorArrayTst];
+
+                    std::ofstream ofs;
+                    ofs.open( "mWss.dat" );
+                    ofs << mWss;
+                    ofs.close();
+
+                    ofs.open( "tad.dat" );
+                    ofs << tad;
+                    ofs.close();
+
+                    ofs.open( "WCArrayCost.dat" );
+                    ofs << "ref" << std::endl
+                        << mWCArrayRef[i].array() << std::endl
+                        << "tst" << std::endl
+                        << mWCArrayTst[idxAvgColorArrayTst].array();
+
+                    std::cout << "tempCost = " << tempCost << std::endl;
+                }        
+            }
+
+            debugCount++;
         }
 
         // // Debug.

@@ -29,11 +29,17 @@ TEST_F( Test_BilateralWindowMatcher, average_color_values )
         imread("/home/yaoyu/SourceCodes/SLFusion/data/SLFusion/DummyImage_TestAverageColorValues.bmp", IMREAD_COLOR);
     // cout << "Image read." << endl;
 
+    // Mask.
+    Mat mask( matTestAvgColorValues.size(), CV_8UC1 );
+    mask.setTo( Scalar::all( 1 ) );
+
+    Mat vcMat, tvcMat;
+
     Mat matAveragedColorValues;
 
     // cout << "matTestAvgColorValues.size() = " << matTestAvgColorValues.size() << endl;
 
-    mBWM->put_average_color_values( matTestAvgColorValues, matAveragedColorValues );
+    mBWM->put_average_color_values( matTestAvgColorValues, matAveragedColorValues, mask, vcMat, tvcMat );
 
     // cout << matAveragedColorValues << endl;
 
@@ -57,6 +63,11 @@ TEST_F( Test_BilateralWindowMatcher, put_wc_01 )
     Mat src( windowWidth, windowWidth, CV_8UC3 );
     src.setTo( Scalar::all( 255 ) );
 
+    Mat mask( windowWidth, windowWidth, CV_8UC1 );
+    mask.setTo( Scalar::all( 1 ) );
+
+    Mat vcMat, tvcMat;
+
     const int centerIdx = ( numKernels - 1 ) / 2;
 
     // Resulting matrix.
@@ -65,7 +76,7 @@ TEST_F( Test_BilateralWindowMatcher, put_wc_01 )
     Mat bufferK( numKernels, numKernels, mBWM->OCV_F_TYPE );
 
     // Get the wc values.
-    mBWM->put_wc( src, wc, bufferK, NULL );
+    mBWM->put_wc( src, mask, wc, bufferK, vcMat, tvcMat, NULL );
 
     // cout << "wc = " << endl << wc << endl;
 
@@ -83,6 +94,11 @@ TEST_F( Test_BilateralWindowMatcher, put_wc_02 )
     Mat src( windowWidth, windowWidth, CV_8UC3 );
     src.setTo( Scalar::all( 255 ) );
 
+    Mat mask( src.size(), CV_8UC1 );
+    mask.setTo( Scalar::all( 1 ) );
+
+    Mat vcMat, tvcMat;
+
     const int centerIdxSrc = ( windowWidth - 1 ) / 2;
     const int centerIdx    = ( numKernels - 1 ) / 2;
 
@@ -96,7 +112,7 @@ TEST_F( Test_BilateralWindowMatcher, put_wc_02 )
     Mat bufferK( numKernels, numKernels, mBWM->OCV_F_TYPE );
 
     // Get the wc values.
-    mBWM->put_wc( src, wc, bufferK, NULL );
+    mBWM->put_wc( src, mask, wc, bufferK, vcMat, tvcMat, NULL );
 
     // cout << "bufferK = " << endl << bufferK << endl;
 
@@ -118,7 +134,7 @@ TEST_F( Test_BilateralWindowMatcher, put_wc_02 )
 
     Mat bufferS( windowWidth, windowWidth, mBWM->OCV_F_TYPE );
 
-    mBWM->put_wc( src, wc, bufferK, &bufferS );
+    mBWM->put_wc( src, mask, wc, bufferK, vcMat, tvcMat, &bufferS );
 
     // cout << "wc = " << endl << wc << endl;
 
@@ -144,6 +160,7 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
     const int maxDisparity = 999;
     const int numDisparity = maxDisparity - minDisparity + 1;
     int pixels = 0;
+    const int halfCount = ( kernelSize * numKernels - 1 ) / 2;
 
     MatchingCost<R_t>* mcArray = NULL;
 
@@ -163,21 +180,21 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
         );
         
         // Padding.
-        Mat padded0, padded1;
+        Mat padded[2], paddedMask[2];
         Scalar s = Scalar(0, 0, 0);
-        if ( 0 != Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded0) )
+        if ( 0 != Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded[0], paddedMask[0]) )
         {
             ASSERT_FALSE(true);
         }
 
-        if ( 0 != Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded1) )
+        if ( 0 != Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded[1], paddedMask[1]) )
         {
             ASSERT_FALSE(true);
         }
 
-        cout << "Size of padded: (" << padded0.rows << ", " << padded0.cols << ")" << endl;
+        cout << "Size of padded: (" << padded[0].rows << ", " << padded[0].cols << ")" << endl;
 
-        pixels = padded0.cols - minDisparity - ( kernelSize * numKernels - 1 );
+        pixels = padded[0].cols - minDisparity - ( kernelSize * numKernels - 1 );
 
         cout << "pixels = " << pixels << endl;
 
@@ -192,14 +209,22 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
 
         // Use this only image as both the reference and test images.
         // Calculate matching cost.
-        mBWM->match_single_line( padded0, padded1, ( kernelSize * numKernels - 1 )/2, minDisparity, maxDisparity, mcArray);
+        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
+            halfCount, minDisparity, maxDisparity, mcArray);
 
         for ( int i = 0; i < pixels; ++i )
         {
             mcArray[i].reset();
         }
 
-        mBWM->match_single_line( padded0, padded1, ( kernelSize * numKernels - 1 )/2, minDisparity, maxDisparity, mcArray);
+        // mBWM->enable_debug();
+        mBWM->debug_set_array_buffer_idx(19);
+
+        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+            halfCount, minDisparity, maxDisparity, mcArray);
+
+        mBWM->disable_debug();
+
         cout << "Internal buffer size of BilateralWindowMatcher: " 
              << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
@@ -213,8 +238,17 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
         ASSERT_FALSE(true);
     }
 
-    const int halfCount = ( kernelSize * numKernels - 1 )/2;
     int nTst = 0;
+
+    // Output the results.
+    string mcDir = "../data/SLFusion/match_single_line_01_cost";
+
+    cout << "Write matching costs to filesystem..." << endl;
+
+    for ( int i = 0; i < pixels; ++i )
+    {
+        mcArray[i].write(mcDir);
+    }
 
     // Verify the results.
     for ( int i = 0; i < pixels; ++i )
@@ -225,14 +259,173 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
         ASSERT_EQ( nTst, ( i + 1 < numDisparity ? i + 1 : numDisparity ) );
         ASSERT_EQ( mcArray[i].get_disparity_array()[nTst - 1], ( i + 1 < numDisparity ? i + minDisparity : maxDisparity ) );
 
-        for ( int idxC = 0; idxC < nTst; ++idxC )
+
+        if ( i >= halfCount && i <= pixels - 1 - halfCount )
         {
-            ASSERT_LT( mcArray[i].get_p_cost()[idxC], 1e-12 ); // This means the value should essentially be zero.
+            for ( int idxC = 0; idxC < nTst; ++idxC )
+            {
+                if ( 0 == idxC )
+                {
+                    if ( mcArray[i].get_p_cost()[idxC] >= 1e-12 )
+                    {
+                        cout << "i = " << i << ", idxC = " << idxC << ", cost = " << mcArray[i].get_p_cost()[idxC] << endl;
+                    }
+                    ASSERT_LT( mcArray[i].get_p_cost()[idxC], 1e-12 ); // This means the value should essentially be zero.
+                }
+                else
+                {
+                    ASSERT_GT( mcArray[i].get_p_cost()[idxC], 0.0 ); // This means not a perfect match.
+                }
+            }
         }
     }
 }
 
 TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
+{
+    using namespace std;
+
+    // Read 1 image.
+    string fn = "../data/SLFusion/L.jpg";
+    Mat img0;
+    const int kernelSize = 3;
+    const int numKernels = 13;
+
+    // Define the disparity range.
+    const int minDisparity = 500;
+    const int maxDisparity = 999;
+    const int numDisparity = maxDisparity - minDisparity + 1;
+    int pixels = 0;
+    const int halfCount = ( kernelSize * numKernels - 1 ) / 2;
+
+    MatchingCost<R_t>* mcArray = NULL;
+
+    try
+    {
+        img0 = imread( fn, cv::IMREAD_COLOR );
+
+        cout << fn << " is read." << endl 
+             << "img0.rows = " << img0.rows << ", "
+             << "img0.cols = " << img0.cols 
+             << endl;
+
+        // Create an image based on img0.
+        Mat img1( img0.size(), img0.type() );
+        img0( Rect( minDisparity, 0, img0.cols - minDisparity, img0.rows) ).copyTo(
+            img1( Rect( 0, 0, img0.cols - minDisparity, img0.rows ) )
+        );
+
+        img0( Rect( 0, 0, minDisparity, img0.rows ) ).copyTo(
+            img1( Rect( img0.cols - minDisparity, 0, minDisparity, img0.rows ) )
+        );
+        
+        // Padding.
+        Mat padded[2], paddedMask[2];
+        Scalar s = Scalar(0, 0, 0);
+        if ( 0 != Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded[0], paddedMask[0]) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        if ( 0 != Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded[1], paddedMask[1]) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        cout << "Size of padded: (" << padded[0].rows << ", " << padded[0].cols << ")" << endl;
+
+        pixels = padded[0].cols - minDisparity - ( kernelSize * numKernels - 1 );
+
+        cout << "pixels = " << pixels << endl;
+
+        // Pre-allocations.
+        mcArray = new MatchingCost<R_t>[ pixels ];
+        for ( int i = 0; i < pixels; ++i )
+        {
+            mcArray[i].allocate(numDisparity);
+        }
+
+        cout << "Estimated memory: " << mcArray[0].estimate_storage() * (pixels) / 1024.0 / 1024 << " MB." << endl;
+
+        // Use this only image as both the reference and test images.
+        // Calculate matching cost.
+        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
+            halfCount, minDisparity, maxDisparity, mcArray);
+
+        for ( int i = 0; i < pixels; ++i )
+        {
+            mcArray[i].reset();
+        }
+
+        mBWM->enable_debug();
+        // mBWM->debug_set_array_buffer_idx( pixels - 1 - halfCount );
+        mBWM->debug_set_array_buffer_idx( pixels - 1 );
+
+        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+            halfCount, minDisparity, maxDisparity, mcArray);
+
+        mBWM->disable_debug();
+
+        cout << "Internal buffer size of BilateralWindowMatcher: " 
+             << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+
+        // Verify the matching cost.
+    }
+    catch ( exception& exp )
+    {
+        delete [] mcArray; mcArray = NULL;
+
+        cout << "wat() " << exp.what() << endl;
+        ASSERT_FALSE(true);
+    }
+
+    int nTst = 0;
+
+    // Output the results.
+    string mcDir = "../data/SLFusion/match_single_line_02_cost";
+
+    cout << "Write matching costs to filesystem..." << endl;
+
+    for ( int i = 0; i < pixels; ++i )
+    {
+        mcArray[i].write(mcDir);
+    }
+
+    // Verify the results.
+    for ( int i = 0; i < pixels; ++i )
+    {
+        ASSERT_EQ( mcArray[i].get_idx_ref(), minDisparity + halfCount + i ); 
+        ASSERT_EQ( mcArray[i].get_disparity_array()[0], minDisparity );
+        nTst = mcArray[i].get_n_test();
+        ASSERT_EQ( nTst, ( i + 1 < numDisparity ? i + 1 : numDisparity ) );
+        ASSERT_EQ( mcArray[i].get_disparity_array()[nTst - 1], ( i + 1 < numDisparity ? i + minDisparity : maxDisparity ) );
+
+
+        for ( int idxC = 0; idxC < nTst; ++idxC )
+        {
+            if ( 0 == idxC && 
+                ( ( i >= halfCount && i <= pixels - 1 - halfCount ) || 
+                  ( ( i + kernelSize/2 + 1 )%kernelSize == 0 )) )
+            {
+                if ( mcArray[i].get_p_cost()[idxC] >= 1e-12 )
+                {
+                    cout << "i = " << i << ", idxC = " << idxC << ", cost = " << mcArray[i].get_p_cost()[idxC] << endl;
+                }
+                ASSERT_LT( mcArray[i].get_p_cost()[idxC], 1e-12 ); // This means the value should essentially be zero.
+            }
+            else
+            {
+                if ( mcArray[i].get_p_cost()[idxC] <= 0 )
+                {
+                    cout << "i = " << i << ", idxC = " << idxC << ", cost = " << mcArray[i].get_p_cost()[idxC] << endl;
+                }
+                ASSERT_GT( mcArray[i].get_p_cost()[idxC], 0.0 ); // This means not a perfect match.
+            }
+        }
+    }
+}
+
+TEST_F(Test_BilateralWindowMatcher, match_single_line_03)
 {
     using namespace std;
 
@@ -273,25 +466,28 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
         img1    = tempImg( Rect(0, 0, width, height) ).clone();
 
         // Save img0 and img1.
-        imwrite( "../data/SLFusion/match_single_line_02_cost/img0.jpg", img0, jpegParams );
-        imwrite( "../data/SLFusion/match_single_line_02_cost/img1.jpg", img1, jpegParams );
+        imwrite( "../data/SLFusion/match_single_line_03_cost/img0.jpg", img0, jpegParams );
+        imwrite( "../data/SLFusion/match_single_line_03_cost/img1.jpg", img1, jpegParams );
         
         // Padding.
-        Mat padded0, padded1;
+        Mat padded[2], paddedMask[2];
         Scalar s = Scalar(0, 0, 0);
-        if ( 0 != Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded0) )
+        if ( 0 != Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded[0], paddedMask[0]) )
         {
             ASSERT_FALSE(true);
         }
 
-        if ( 0 != Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded1) )
+        if ( 0 != Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded[1], paddedMask[1]) )
         {
             ASSERT_FALSE(true);
         }
 
-        cout << "Size of padded: (" << padded0.rows << ", " << padded0.cols << ")" << endl;
+        cout << "Size of padded: (" << padded[0].rows << ", " << padded[0].cols << ")" << endl;
 
-        pixels = padded0.cols - minDisparity - ( kernelSize * numKernels - 1 );
+        imwrite( "../data/SLFusion/match_single_line_03_cost/padded[0].jpg", padded[0], jpegParams );
+        imwrite( "../data/SLFusion/match_single_line_03_cost/padded[1].jpg", padded[1], jpegParams );
+
+        pixels = padded[0].cols - minDisparity - ( kernelSize * numKernels - 1 );
 
         cout << "pixels = " << pixels << endl;
 
@@ -306,14 +502,19 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
 
         // Use this only image as both the reference and test images.
         // Calculate matching cost.
-        mBWM->match_single_line( padded0, padded1, ( kernelSize * numKernels - 1 )/2, minDisparity, maxDisparity, mcArray);
+        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+            ( kernelSize * numKernels - 1 )/2 + height / 2 - 1, minDisparity, maxDisparity, mcArray);
 
         for ( int i = 0; i < pixels; ++i )
         {
             mcArray[i].reset();
         }
 
-        mBWM->match_single_line( padded0, padded1, ( kernelSize * numKernels - 1 )/2, minDisparity, maxDisparity, mcArray);
+        // mBWM->enable_debug();
+        // mBWM->debug_set_array_buffer_idx(0);
+
+        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+            ( kernelSize * numKernels - 1 )/2 + height / 2 - 1, minDisparity, maxDisparity, mcArray);
         cout << "Internal buffer size of BilateralWindowMatcher: " 
              << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
@@ -331,7 +532,107 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
     int nTst = 0;
 
     // Output the results.
-    string mcDir = "../data/SLFusion/match_single_line_02_cost";
+    string mcDir = "../data/SLFusion/match_single_line_03_cost";
+
+    cout << "Write matching costs to filesystem..." << endl;
+
+    for ( int i = 0; i < pixels; ++i )
+    {
+        mcArray[i].write(mcDir);
+    }
+}
+
+TEST_F(Test_BilateralWindowMatcher, match_single_line_04)
+{
+    using namespace std;
+
+    // Read 1 image.
+    string fn = "../data/SLFusion/L.jpg";
+    Mat img0;
+    const int kernelSize = 3;
+    const int numKernels = 13;
+
+    // Define the disparity range.
+    const int minDisparity = 500;
+    const int maxDisparity = 999;
+    const int numDisparity = maxDisparity - minDisparity + 1;
+    const int halfCount    = ( kernelSize * numKernels - 1 ) / 2;
+    const int shift        = minDisparity / 2;
+    int pixels = 0;
+
+    MatchingCost<R_t>* mcArray = NULL;
+
+    try
+    {
+        img0 = imread( fn, cv::IMREAD_COLOR );
+
+        cout << fn << " is read." << endl 
+             << "img0.rows = " << img0.rows << ", "
+             << "img0.cols = " << img0.cols 
+             << endl;
+
+        // Create an image based on img0.
+        Mat img1( img0.size(), img0.type() );
+        img0( Rect( minDisparity + shift, 0, img0.cols - minDisparity - shift, img0.rows) ).copyTo(
+            img1( Rect( 0, 0, img0.cols - minDisparity - shift, img0.rows ) )
+        );
+
+        img0( Rect( 0, 0, minDisparity + shift, img0.rows ) ).copyTo(
+            img1( Rect( img0.cols - minDisparity - shift, 0, minDisparity + shift, img0.rows ) )
+        );
+        
+        cout << "Target disparity = " << minDisparity + shift << endl;
+
+        // Padding.
+        Mat padded[2], paddedMask[2];
+        Scalar s = Scalar(0, 0, 0);
+        if ( 0 != Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded[0], paddedMask[0]) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        if ( 0 != Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded[1], paddedMask[1]) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        cout << "Size of padded: (" << padded[0].rows << ", " << padded[0].cols << ")" << endl;
+
+        pixels = padded[0].cols - minDisparity - ( kernelSize * numKernels - 1 );
+
+        cout << "pixels = " << pixels << endl;
+
+        // Pre-allocations.
+        mcArray = new MatchingCost<R_t>[ pixels ];
+        for ( int i = 0; i < pixels; ++i )
+        {
+            mcArray[i].allocate(numDisparity);
+        }
+
+        cout << "Estimated memory: " << mcArray[0].estimate_storage() * (pixels) / 1024.0 / 1024 << " MB." << endl;
+
+        // Use this only image as both the reference and test images.
+        // Calculate matching cost.
+        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
+            padded[0].rows / 2, minDisparity, maxDisparity, mcArray);
+
+        cout << "Internal buffer size of BilateralWindowMatcher: " 
+             << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+
+        // Verify the matching cost.
+    }
+    catch ( exception& exp )
+    {
+        delete [] mcArray; mcArray = NULL;
+
+        cout << "wat() " << exp.what() << endl;
+        ASSERT_FALSE(true);
+    }
+
+    int nTst = 0;
+
+    // Output the results.
+    string mcDir = "../data/SLFusion/match_single_line_04_cost";
 
     cout << "Write matching costs to filesystem..." << endl;
 

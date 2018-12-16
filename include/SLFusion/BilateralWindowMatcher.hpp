@@ -126,7 +126,7 @@ public:
         // Filename.
         std::stringstream ss;
         ss.str(""); ss.clear();
-        ss << dn << "/" << mIdxRef << ".dat";
+        ss << dn << "/" << std::setfill('0') << std::setw(5) << mIdxRef << ".dat";
 
         std::ofstream ofs;
         ofs.open( ss.str() );
@@ -184,7 +184,9 @@ public:
      * @param nMC The number of MachingCost<Real_t> objects stored starting from pMC. nMC must be smaller than the capacity of pMC. Pass NULL if not interested.
      */
     void match_single_line(
-        const Mat& refMat, const Mat& tstMat, int rowIdx,
+        const Mat& refMat, const Mat& tstMat, 
+        const Mat& refMask, const Mat& tstMask,
+        int rowIdx,
         int minDisp, int maxDisp, 
         MatchingCost<Real_t>* pMC, int* nMC = NULL);
 
@@ -202,17 +204,20 @@ protected:
      * @param _src The dimension is (mKernelSize * mNumKernels)^2. _src is assumed to have data type CV_8UC1 or CV_8UC3.
      * @param _dst The dimension is mNumKernels^2. The data type of _dst is either CV_32FC1 or CV_32FC3.
      */
-    void put_average_color_values(InputArray _src, OutputArray _dst);
+    void put_average_color_values(
+        InputArray _src, OutputArray _dst, InputArray _mask, OutputArray _validCount, OutputArray _tempValidCount);
 
     /**
      * @param src Data type is CV_8UC1 or CV_8UC3.
      * @param bufferS A Mat buffer which has the same height and width of the support window.
      * 
      */
-    void put_wc(const Mat& src, FMatrix_t& wc, Mat& avgColor, Mat* bufferS = NULL);
+    void put_wc(const Mat& src, const Mat& mask, 
+        FMatrix_t& wc, Mat& avgColor, Mat& vcMat, Mat& tvcMat, Mat* bufferS = NULL);
 
     template<typename tR, typename tT> Real_t TAD( const tR* pr, const tT* pt, int channels );
-    void TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad);
+
+    template<typename _TR, typename _TT> void TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad);
 
 private:
     /**
@@ -269,6 +274,8 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_02);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_01);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_02);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_03);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_04);
 };
 
 class Test_BilateralWindowMatcher : public ::testing::Test
