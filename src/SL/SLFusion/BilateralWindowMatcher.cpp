@@ -174,10 +174,10 @@ put_Ws_map( const FM_t& distanceMap, double gs, FM_t& Ws)
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 : OCV_F_TYPE(CV_32FC1),
-  mGammaS(14), mGammaC(23), mTAD_T(255),
+  mGammaS(1), mGammaC(5), mTAD_T(10000),
   mACArrayRef(NULL), mACArrayTst(NULL), mWCArrayRef(NULL), mWCArrayTst(NULL), mABSize(0),
   mABMemorySize(0),
-  mFlagDebug(false), mDebug_ABIdx(0)
+  mFlagDebug(false), mDebug_ABIdx0(0), mDebug_ABIdx1(0), mDebug_OutDir("./DebugOutDir")
 {
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
@@ -448,7 +448,7 @@ void BilateralWindowMatcher::put_average_color_values(
 
         // Pointer to the dst Mat.
         kernelIndexRow = *( knlIdxRow + pos );
-        pD = dst.ptr<float>( kernelIndexRow );
+        pD = dst.ptr<R_t>( kernelIndexRow );
 
         // Pointer to the mask.
         pM = mask.ptr<uchar>(i);
@@ -604,6 +604,8 @@ void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad
     int posCol = 0, posColShift = 0;
     int posTad = 0;
 
+    tad.setConstant(0.0);
+
     for ( int i = 0; i < ref.rows; ++i )
     {
         // Get the pointer to the ref and tst.
@@ -736,9 +738,15 @@ void BilateralWindowMatcher::disable_debug(void)
     mFlagDebug = false;
 }
 
-void BilateralWindowMatcher::debug_set_array_buffer_idx(size_t idx)
+void BilateralWindowMatcher::debug_set_array_buffer_idx(size_t idx0, size_t idx1)
 {
-    mDebug_ABIdx = idx;
+    mDebug_ABIdx0 = idx0;
+    mDebug_ABIdx1 = idx1;
+}
+
+void BilateralWindowMatcher::debug_set_out_dir(const std::string& dir)
+{
+    mDebug_OutDir = dir;
 }
 
 void BilateralWindowMatcher::create_array_buffer(size_t size, int matType, bool force)
@@ -912,14 +920,16 @@ void BilateralWindowMatcher::match_single_line(
         // Debug.
         if ( true == mFlagDebug )
         {
-            if ( i == mDebug_ABIdx )
+            if ( i == mDebug_ABIdx0 )
             {
                 Mat channelsRef[3], channelsTst[3];
                 split( mACArrayRef[i], channelsRef );
                 split( mACArrayTst[i], channelsTst );
 
+                std::string fnTemp = mDebug_OutDir + "/mACArray.yml"; 
+
                 FileStorage fs;
-                fs.open("mACArray.yml", FileStorage::WRITE);
+                fs.open(fnTemp, FileStorage::WRITE);
                 fs << "i" << i
                    << "refC0" << channelsRef[0]
                    << "refC1" << channelsRef[1]
@@ -940,11 +950,14 @@ void BilateralWindowMatcher::match_single_line(
                 jpegParams.push_back(IMWRITE_JPEG_QUALITY);
                 jpegParams.push_back(100);
 
-                imwrite("windowsRef.jpg", windowRef, jpegParams);
-                imwrite("windowsTst.jpg", windowTst, jpegParams);
+                fnTemp = mDebug_OutDir + "/windowsRef.jpg";
+                imwrite(fnTemp, windowRef, jpegParams);
+                fnTemp = mDebug_OutDir + "/windowsTst.jpg";
+                imwrite(fnTemp, windowTst, jpegParams);
 
+                fnTemp = mDebug_OutDir + "/mWCArray.dat";
                 std::ofstream ofs;
-                ofs.open( "mWCArray.dat" );
+                ofs.open( fnTemp );
                 ofs << mWCArrayRef[i] << std::endl << std::endl << mWCArrayTst[i];
                 ofs.close();
             }
@@ -981,7 +994,7 @@ void BilateralWindowMatcher::match_single_line(
 
             if ( true == mFlagDebug )
             {
-                if ( i == mDebug_ABIdx && j == 0 )
+                if ( i == mDebug_ABIdx0 && j == mDebug_ABIdx1 )
                 {
                     std::cout << "Debug." << std::endl;
                 }
@@ -1002,24 +1015,33 @@ void BilateralWindowMatcher::match_single_line(
 
             if ( true == mFlagDebug )
             {
-                if ( i == mDebug_ABIdx && j == 0 )
+                if ( i == mDebug_ABIdx0 && j == mDebug_ABIdx1 )
                 {
+                    std::string fnTemp;
+
+                    fnTemp = mDebug_OutDir + "/mACArray_cost.yml";
                     FileStorage fs;
-                    fs.open("mACArray_cost.yml", FileStorage::WRITE);
+                    fs.open(fnTemp, FileStorage::WRITE);
                     fs << "i" << i
+                       << "tempCost" << tempCost
+                       << "disp" << minDisp + j
+                       << "idxAvgColorArrayTst" << idxAvgColorArrayTst
                        << "ref" << mACArrayRef[i]
                        << "tst" << mACArrayTst[idxAvgColorArrayTst];
 
+                    fnTemp = mDebug_OutDir + "/mWss.dat";
                     std::ofstream ofs;
-                    ofs.open( "mWss.dat" );
+                    ofs.open( fnTemp );
                     ofs << mWss;
                     ofs.close();
 
-                    ofs.open( "tad.dat" );
+                    fnTemp = mDebug_OutDir + "/tad.dat";
+                    ofs.open( fnTemp );
                     ofs << tad;
                     ofs.close();
 
-                    ofs.open( "WCArrayCost.dat" );
+                    fnTemp = mDebug_OutDir + "/WCArrayCost.dat";
+                    ofs.open( fnTemp );
                     ofs << "ref" << std::endl
                         << mWCArrayRef[i].array() << std::endl
                         << "tst" << std::endl

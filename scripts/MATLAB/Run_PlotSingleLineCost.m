@@ -2,7 +2,7 @@ clear;
 close all;
 clc;
 
-WORK_DIR = '../../data/SLFusion/match_single_line_04_cost';
+WORK_DIR = '../../data/SLFusion/match_single_line_05_cost';
 
 % List all the file with extension .dat.
 

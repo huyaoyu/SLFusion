@@ -14,6 +14,9 @@
 
 #include "SLFException/SLFException.hpp"
 
+#define OMIT_TESTS \
+    do { } while(0)
+
 // Name space delaration.
 using namespace cv;
 using namespace Eigen;
@@ -65,7 +68,7 @@ public:
         mCostArray = new _T[mSize];
     }
 
-    void push_back(int idxTst, _T cost)
+    void push_back(int disp, _T cost)
     {
         if ( mNTst == mSize )
         {
@@ -73,7 +76,7 @@ public:
             EXCEPTION_BASE("MatchingCost object reaches the maximum capacity.");
         }
 
-        mDispArray[mNTst] = idxTst;
+        mDispArray[mNTst] = disp;
         mCostArray[mNTst] = cost;
         mNTst++;
     }
@@ -197,7 +200,8 @@ public:
 
     void enable_debug(void);
     void disable_debug(void);
-    void debug_set_array_buffer_idx(size_t idx);
+    void debug_set_array_buffer_idx(size_t idx0, size_t idx1 = 0);
+    void debug_set_out_dir(const std::string& dir);
 
 protected:
     /**
@@ -265,17 +269,23 @@ private:
     size_t     mABMemorySize; // The memory of all array buffers in bytes.
 
     bool mFlagDebug;
-    size_t mDebug_ABIdx;
+    size_t mDebug_ABIdx0;
+    size_t mDebug_ABIdx1;
+    std::string mDebug_OutDir;
 
 public:
     friend class Test_BilateralWindowMatcher;
     FRIEND_TEST(Test_BilateralWindowMatcher, average_color_values);
     FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_01);
     FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_02);
+#ifndef OMIT_TESTS
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_01);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_02);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_03);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_04);
+#endif
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_06);
 };
 
 class Test_BilateralWindowMatcher : public ::testing::Test
