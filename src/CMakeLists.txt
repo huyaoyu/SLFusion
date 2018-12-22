@@ -108,9 +108,14 @@ target_link_libraries(exe_${PROJECT_NAME} ${OpenCV_LIBS}
   ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${CNPY_LIBRARIES} z
 )
 
+# Test section.
+
 FILE(GLOB_RECURSE SRC_LIST_TEST SL_Test/*.cpp)
 
 add_executable(test_${PROJECT_NAME} ${SRC_LIST} ${SRC_LIST_TEST} test.cpp)
+
+# Define the TEST_SECTION macro.
+target_compile_definitions(test_${PROJECT_NAME} PRIVATE TEST_SECTION)
 
 find_package(GTest)
 message(STATUS "GTest_FOUND = ${GTest_FOUND}")

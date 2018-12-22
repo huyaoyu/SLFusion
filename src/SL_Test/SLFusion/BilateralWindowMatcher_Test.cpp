@@ -12,137 +12,113 @@ using namespace cv;
 using namespace Eigen;
 using namespace std;
 
+const int slf::Test_BilateralWindowMatcher::mDefaultKernelSize  = 3;
+const int slf::Test_BilateralWindowMatcher::mDefaultNumKernels  = 13;
+const int slf::Test_BilateralWindowMatcher::mDefaultWindowWidth = 3 * 13;
+
 namespace slf
 {
 
-typedef BilateralWindowMatcher::IMatrix_t IM_t;
-typedef BilateralWindowMatcher::FMatrix_t FM_t;
-typedef BilateralWindowMatcher::Real_t    R_t;
+typedef IMatrix_t IM_t;
+typedef FMatrix_t FM_t;
+typedef Real_t    R_t;
 
-BilateralWindowMatcher* Test_BilateralWindowMatcher::mBWM = NULL;
-
-TEST_F( Test_BilateralWindowMatcher, average_color_values )
+TEST_F( Test_BilateralWindowMatcher, getter_setter )
 {
-    // Read the image file.
-    // cout << "Before read image." << endl;
-    Mat matTestAvgColorValues = 
-        imread("/home/yaoyu/SourceCodes/SLFusion/data/SLFusion/DummyImage_TestAverageColorValues.bmp", IMREAD_COLOR);
-    // cout << "Image read." << endl;
+    // Create an object to work with.
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
 
-    // Mask.
-    Mat mask( matTestAvgColorValues.size(), CV_8UC1 );
-    mask.setTo( Scalar::all( 1 ) );
+    bwm.set_gamma_c(12.0);
+    bwm.set_gamma_s(19.0);
 
-    Mat vcMat, tvcMat;
-
-    Mat matAveragedColorValues;
-
-    // cout << "matTestAvgColorValues.size() = " << matTestAvgColorValues.size() << endl;
-
-    mBWM->put_average_color_values( matTestAvgColorValues, matAveragedColorValues, mask, vcMat, tvcMat );
-
-    // cout << matAveragedColorValues << endl;
-
-    int lastIdx = mBWM->get_num_kernels_single_side() - 1;
-
-    ASSERT_EQ(  4, matAveragedColorValues.at<Vec3f>(0, 0)[0] );
-    ASSERT_EQ( 13, matAveragedColorValues.at<Vec3f>(0, 0)[1] );
-    ASSERT_EQ( 22, matAveragedColorValues.at<Vec3f>(0, 0)[2] );
-
-    ASSERT_EQ(  4, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[0] );
-    ASSERT_EQ( 13, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[1] );
-    ASSERT_EQ( 22, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[2] );
+    ASSERT_EQ( bwm.get_kernel_size(), mDefaultKernelSize ) << "Kernel size.";
+    ASSERT_EQ( bwm.get_num_kernels_single_side(), mDefaultNumKernels ) << "Number of kernels.";
+    ASSERT_EQ( bwm.get_window_width(), mDefaultWindowWidth ) << "Window width.";
+    ASSERT_EQ( bwm.get_gamma_c(), 12.0 ) << "gamma_c";
+    ASSERT_EQ( bwm.get_gamma_s(), 19.0 ) << "gamma_s";
 }
 
-TEST_F( Test_BilateralWindowMatcher, put_wc_01 )
+TEST_F( Test_BilateralWindowMatcher, create_array_buffer )
 {
-    // Create an input Mat object with all its pixels equal Scalar::all(255).
-    const int numKernels  = mBWM->get_num_kernels_single_side();
-    const int windowWidth = mBWM->get_window_width();
+    // Create an object to work with.
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
 
-    Mat src( windowWidth, windowWidth, CV_8UC3 );
-    src.setTo( Scalar::all( 255 ) );
+    size_t size   = 4000;
+    int cvMatType = CV_32FC1;
 
-    Mat mask( windowWidth, windowWidth, CV_8UC1 );
-    mask.setTo( Scalar::all( 1 ) );
+    // Call private member method to create buffers.
+    bwm.create_array_buffer( size, cvMatType, false );
 
-    Mat vcMat, tvcMat;
+    ASSERT_EQ( bwm.mABSize, 4000 ) << "The inner buffer size (count).";
+    
+    // Save the buffer header pointers for now.
+    void* tempACArrayRef = (void*)( bwm.mACArrayRef );
+    void* tempACArrayTst = (void*)( bwm.mACArrayTst );
+    void* tempWCArrayRef = (void*)( bwm.mWCArrayRef );
+    void* tempWCArrayTst = (void*)( bwm.mWCArrayTst );
 
-    const int centerIdx = ( numKernels - 1 ) / 2;
+    // Try to create the buffer with the same size.
+    bwm.create_array_buffer( size, cvMatType, false );
 
-    // Resulting matrix.
-    FM_t wc = FM_t( numKernels, numKernels );
+    // The buffer header pointers should not be changed.
+    ASSERT_EQ( tempACArrayRef, (void*)(bwm.mACArrayRef) ) << "The buffer header pointer mACArrayRef";
+    ASSERT_EQ( tempACArrayTst, (void*)(bwm.mACArrayTst) ) << "The buffer header pointer mACArrayTst";
+    ASSERT_EQ( tempWCArrayRef, (void*)(bwm.mWCArrayRef) ) << "The buffer header pointer mWCArrayRef";
+    ASSERT_EQ( tempWCArrayTst, (void*)(bwm.mWCArrayTst) ) << "The buffer header pointer mWCArrayTst";
 
-    Mat bufferK( numKernels, numKernels, mBWM->OCV_F_TYPE );
+    // Try to create the buffer with smaller size without force flag.
+    bwm.create_array_buffer( size - 1000, cvMatType, false );
 
-    // Get the wc values.
-    mBWM->put_wc( src, mask, wc, bufferK, vcMat, tvcMat, NULL );
+    // The buffer header pointers should not be changed.
+    ASSERT_EQ( tempACArrayRef, (void*)(bwm.mACArrayRef) ) << "The buffer header pointer mACArrayRef after creation with the smaller size.";
+    ASSERT_EQ( tempACArrayTst, (void*)(bwm.mACArrayTst) ) << "The buffer header pointer mACArrayTst after creation with the smaller size.";
+    ASSERT_EQ( tempWCArrayRef, (void*)(bwm.mWCArrayRef) ) << "The buffer header pointer mWCArrayRef after creation with the smaller size.";
+    ASSERT_EQ( tempWCArrayTst, (void*)(bwm.mWCArrayTst) ) << "The buffer header pointer mWCArrayTst after creation with the smaller size.";
 
-    // cout << "wc = " << endl << wc << endl;
+    // But the mABSize must be changed.
+    ASSERT_EQ( bwm.mABSize, size - 1000 ) << "mABSize must be changed.";
 
-    ASSERT_EQ( wc( 0, 0), 1 );
-    ASSERT_EQ( wc( centerIdx, centerIdx), 1 );
-    ASSERT_EQ( wc( numKernels - 1, numKernels - 1), 1 );
-}
+    // Try to create a larger buffer.
+    bwm.create_array_buffer( size + 1000, cvMatType, false );
 
-TEST_F( Test_BilateralWindowMatcher, put_wc_02 )
-{
-    // Create an input Mat object with all its pixels equal Scalar::all(255) except the center one.
-    const int numKernels  = mBWM->get_num_kernels_single_side();
-    const int windowWidth = mBWM->get_window_width();
+    // All of the buffer header pointers should be modified.
+    ASSERT_NE( tempACArrayRef, (void*)(bwm.mACArrayRef) ) << "The buffer header pointer mACArrayRef after creation with larger size.";
+    ASSERT_NE( tempACArrayTst, (void*)(bwm.mACArrayTst) ) << "The buffer header pointer mACArrayTst after creation with larger size.";
+    ASSERT_NE( tempWCArrayRef, (void*)(bwm.mWCArrayRef) ) << "The buffer header pointer mWCArrayRef after creation with larger size.";
+    ASSERT_NE( tempWCArrayTst, (void*)(bwm.mWCArrayTst) ) << "The buffer header pointer mWCArrayTst after creation with larger size.";
+    ASSERT_EQ( bwm.mABSize, size + 1000 ) << "mABSize must be changed after creation with larger size.";
 
-    Mat src( windowWidth, windowWidth, CV_8UC3 );
-    src.setTo( Scalar::all( 255 ) );
+    // Save the buffer header pointers for now.
+    tempACArrayRef = (void*)( bwm.mACArrayRef );
+    tempACArrayTst = (void*)( bwm.mACArrayTst );
+    tempWCArrayRef = (void*)( bwm.mWCArrayRef );
+    tempWCArrayTst = (void*)( bwm.mWCArrayTst );
 
-    Mat mask( src.size(), CV_8UC1 );
-    mask.setTo( Scalar::all( 1 ) );
+    // Try forcing creation.
+    bwm.create_array_buffer( size + 1000, cvMatType, true );
 
-    Mat vcMat, tvcMat;
+    // All of the buffer header pointers should be modified.
+    ASSERT_NE( tempACArrayRef, (void*)(bwm.mACArrayRef) ) << "After forcing creation of mACArrayRef without changing the size.";
+    ASSERT_NE( tempACArrayTst, (void*)(bwm.mACArrayTst) ) << "After forcing creation of mACArrayTst without changing the size.";
+    ASSERT_NE( tempWCArrayRef, (void*)(bwm.mWCArrayRef) ) << "After forcing creation of mWCArrayRef without changing the size.";
+    ASSERT_NE( tempWCArrayTst, (void*)(bwm.mWCArrayTst) ) << "After forcing creation of mWCArrayTst without changing the size.";
+    ASSERT_EQ( bwm.mABSize, size + 1000 ) << "mABSize remains the same after forcing creation without changing the size.";
 
-    const int centerIdxSrc = ( windowWidth - 1 ) / 2;
-    const int centerIdx    = ( numKernels - 1 ) / 2;
+    // Save the buffer header pointers for now.
+    tempACArrayRef = (void*)( bwm.mACArrayRef );
+    tempACArrayTst = (void*)( bwm.mACArrayTst );
+    tempWCArrayRef = (void*)( bwm.mWCArrayRef );
+    tempWCArrayTst = (void*)( bwm.mWCArrayTst );
 
-    ASSERT_EQ( centerIdxSrc, 19 );
+    // Try forcing creation with smaller size.
+    bwm.create_array_buffer( size, cvMatType, true );
 
-    src.at<Vec3b>( centerIdxSrc, centerIdxSrc ) = Vec3b( 1, 1, 1 );
-
-    // Resulting matrix.
-    FM_t wc = FM_t( numKernels, numKernels );
-
-    Mat bufferK( numKernels, numKernels, mBWM->OCV_F_TYPE );
-
-    // Get the wc values.
-    mBWM->put_wc( src, mask, wc, bufferK, vcMat, tvcMat, NULL );
-
-    // cout << "bufferK = " << endl << bufferK << endl;
-
-    // cout << "wc = " << endl << wc << endl;
-
-    const R_t nonCenterValue = 0.11939494898409;
-    const R_t eps = 1e-5;
-
-    ASSERT_LT( std::fabs( ( wc(0, 0) - nonCenterValue ) / nonCenterValue ), eps );
-
-    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc - 0 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdxSrc - 0, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdxSrc - 0, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc - 0 ) = Vec3b( 1, 1, 1 );
-    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
-
-    Mat bufferS( windowWidth, windowWidth, mBWM->OCV_F_TYPE );
-
-    mBWM->put_wc( src, mask, wc, bufferK, vcMat, tvcMat, &bufferS );
-
-    // cout << "wc = " << endl << wc << endl;
-
-    const R_t nonCenterValue2 = 4.930302754597667e-09;
-
-    ASSERT_EQ( wc( centerIdx,     centerIdx     ), 1 );
-    ASSERT_LT( std::fabs( ( wc(centerIdx - 1, centerIdx + 1) - nonCenterValue2 ) / nonCenterValue2 ), eps );
-    ASSERT_LT( std::fabs( ( wc(centerIdx + 1, centerIdx - 1) - nonCenterValue2 ) / nonCenterValue2 ), eps );
+    // All of the buffer header pointers should be modified.
+    ASSERT_NE( tempACArrayRef, (void*)(bwm.mACArrayRef) ) << "After forcing creation of mACArrayRef with smaller size.";
+    ASSERT_NE( tempACArrayTst, (void*)(bwm.mACArrayTst) ) << "After forcing creation of mACArrayTst with smaller size.";
+    ASSERT_NE( tempWCArrayRef, (void*)(bwm.mWCArrayRef) ) << "After forcing creation of mWCArrayRef with smaller size.";
+    ASSERT_NE( tempWCArrayTst, (void*)(bwm.mWCArrayTst) ) << "After forcing creation of mWCArrayTst with smaller size.";
+    ASSERT_EQ( bwm.mABSize, size ) << "mABSize remains the same after forcing creation without changing the size.";
 }
 
 #ifndef OMIT_TESTS
@@ -150,6 +126,8 @@ TEST_F( Test_BilateralWindowMatcher, put_wc_02 )
 TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
 {
     using namespace std;
+
+    BilateralWindowMatcher bwm( 3, 13 );
 
     // Read 1 image.
     string fn = "../data/SLFusion/L.jpg";
@@ -211,7 +189,7 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
 
         // Use this only image as both the reference and test images.
         // Calculate matching cost.
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
             halfCount, minDisparity, maxDisparity, mcArray);
 
         for ( int i = 0; i < pixels; ++i )
@@ -219,16 +197,16 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
             mcArray[i].reset();
         }
 
-        // mBWM->enable_debug();
-        mBWM->debug_set_array_buffer_idx(19);
+        // bwm.enable_debug();
+        bwm.debug_set_array_buffer_idx(19);
 
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
             halfCount, minDisparity, maxDisparity, mcArray);
 
-        mBWM->disable_debug();
+        bwm.disable_debug();
 
         cout << "Internal buffer size of BilateralWindowMatcher: " 
-             << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+             << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
         // Verify the matching cost.
     }
@@ -286,6 +264,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
 TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
 {
     using namespace std;
+
+    BilateralWindowMatcher bwm( 3, 13 );
 
     // Read 1 image.
     string fn = "../data/SLFusion/L.jpg";
@@ -351,7 +331,7 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
 
         // Use this only image as both the reference and test images.
         // Calculate matching cost.
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
             halfCount, minDisparity, maxDisparity, mcArray);
 
         for ( int i = 0; i < pixels; ++i )
@@ -359,17 +339,17 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
             mcArray[i].reset();
         }
 
-        mBWM->enable_debug();
-        // mBWM->debug_set_array_buffer_idx( pixels - 1 - halfCount );
-        mBWM->debug_set_array_buffer_idx( pixels - 1 );
+        bwm.enable_debug();
+        // bwm.debug_set_array_buffer_idx( pixels - 1 - halfCount );
+        bwm.debug_set_array_buffer_idx( pixels - 1 );
 
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
             halfCount, minDisparity, maxDisparity, mcArray);
 
-        mBWM->disable_debug();
+        bwm.disable_debug();
 
         cout << "Internal buffer size of BilateralWindowMatcher: " 
-             << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+             << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
         // Verify the matching cost.
     }
@@ -430,6 +410,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
 TEST_F(Test_BilateralWindowMatcher, match_single_line_03)
 {
     using namespace std;
+
+    BilateralWindowMatcher bwm( 3, 13 );
 
     // Read 1 image.
     const string fn0 = "../data/SLFusion/L.jpg";
@@ -504,7 +486,7 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_03)
 
         // Use this only image as both the reference and test images.
         // Calculate matching cost.
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
             ( kernelSize * numKernels - 1 )/2 + height / 2 - 1, minDisparity, maxDisparity, mcArray);
 
         for ( int i = 0; i < pixels; ++i )
@@ -512,13 +494,13 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_03)
             mcArray[i].reset();
         }
 
-        // mBWM->enable_debug();
-        // mBWM->debug_set_array_buffer_idx(0);
+        // bwm.enable_debug();
+        // bwm.debug_set_array_buffer_idx(0);
 
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
             ( kernelSize * numKernels - 1 )/2 + height / 2 - 1, minDisparity, maxDisparity, mcArray);
         cout << "Internal buffer size of BilateralWindowMatcher: " 
-             << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+             << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
         // Verify the matching cost.
     }
@@ -547,6 +529,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_03)
 TEST_F(Test_BilateralWindowMatcher, match_single_line_04)
 {
     using namespace std;
+
+    BilateralWindowMatcher bwm( 3, 13 );
 
     // Read 1 image.
     string fn = "../data/SLFusion/L.jpg";
@@ -615,11 +599,11 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_04)
 
         // Use this only image as both the reference and test images.
         // Calculate matching cost.
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1], 
             padded[0].rows / 2, minDisparity, maxDisparity, mcArray);
 
         cout << "Internal buffer size of BilateralWindowMatcher: " 
-             << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+             << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
         // Verify the matching cost.
     }
@@ -649,6 +633,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_04)
 TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
 {
     using namespace std;
+
+    BilateralWindowMatcher bwm( 3, 13 );
 
     // Read 1 image.
     const string fn0 = "../data/SLFusion/Sep27_Pillar/Rectified_L_color.jpg";
@@ -721,15 +707,15 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
 
         // Calculate matching cost.
         
-        mBWM->enable_debug();
-        mBWM->debug_set_array_buffer_idx(3095, 1);
+        bwm.enable_debug();
+        bwm.debug_set_array_buffer_idx(3095, 1);
 
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
             ( kernelSize * numKernels - 1 )/2 + img0.rows / 2 - 100, minDisparity, maxDisparity, mcArray);
         cout << "Internal buffer size of BilateralWindowMatcher: " 
-             << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+             << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
-        mBWM->disable_debug();
+        bwm.disable_debug();
 
         // Verify the matching cost.
     }
@@ -794,6 +780,8 @@ static void create_checkboard(int height, int width, int low, int high, int type
 TEST_F(Test_BilateralWindowMatcher, match_single_line_06)
 {
     using namespace std;
+
+    BilateralWindowMatcher bwm( 3, 13 );
 
     // Read 1 image.
     Mat img0, img1;
@@ -863,15 +851,15 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_06)
 
         // Calculate matching cost.
         
-        // mBWM->enable_debug();
-        // mBWM->debug_set_array_buffer_idx(19, 0);
+        // bwm.enable_debug();
+        // bwm.debug_set_array_buffer_idx(19, 0);
 
-        mBWM->match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
             ( windowWidth - 1 )/2 + img0.rows / 2, minDisparity, maxDisparity, mcArray);
         cout << "Internal buffer size of BilateralWindowMatcher: " 
-             << mBWM->get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+             << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
-        // mBWM->disable_debug();
+        // bwm.disable_debug();
 
         // Verify the matching cost.
     }

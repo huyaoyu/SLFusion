@@ -153,29 +153,104 @@ protected:
     const int  mDataUnit;
 };
 
+typedef float Real_t;
+typedef Matrix<   int, -1, -1, RowMajor> IMatrix_t;
+typedef Matrix<Real_t, -1, -1, RowMajor> FMatrix_t;
+
+class IndexMapper
+{
+public:
+    IndexMapper(int w, int nw);
+    ~IndexMapper();
+
+    static void
+    put_index_map(IMatrix_t& ri, IMatrix_t& ci, 
+        IMatrix_t& rri, IMatrix_t& rci, 
+        IMatrix_t& knlRfnIdxRow, IMatrix_t& knlRfnIdxCol, 
+        int w);
+
+    void show(void);
+
+public:
+    IMatrix_t mIndexMapRow; // A 2D map. Each element of this map records its central row index in the original window.
+    IMatrix_t mIndexMapCol; // A 2D map. Each element of this map records its central col index in the original window.
+
+    IMatrix_t mKnlIdxRow; // A 2D reference map. Each element of this map records its row index in the gridded, small matrix.
+    IMatrix_t mKnlIdxCol; // A 2D reference map. Each element of this map records its col index in the gridded, small matrix.
+
+    IMatrix_t mPntIdxKnlRow; // A 2D index matrix. Each element is the original row index of a single kernel center.
+    IMatrix_t mPntIdxKnlCol; // A 2D index matrix. Each element is the original col index of a single kernel center.
+};
+
+class WeightColor
+{
+public:
+    WeightColor(); // This default constructor is only for implicit initialization.
+    WeightColor(int numKernels, IMatrix_t& knlIdxRow, IMatrix_t& knlIdxCol, Real_t gammaC);
+    ~WeightColor();
+
+    void wc(const Mat& src, const Mat& mask, FMatrix_t& wc, Mat& avgColor);
+
+    WeightColor& operator=( const WeightColor& rhs );
+
+private:
+    /**
+     * @param _src The dimension is (mKernelSize * mNumKernels)^2. _src is assumed to have data type CV_8UC1 or CV_8UC3.
+     * @param _dst The dimension is mNumKernels^2. The data type of _dst is either CV_32FC1 or CV_32FC3.
+     */
+    void put_average_color_values(
+        InputArray _src, OutputArray _dst, InputArray _mask, OutputArray _validCount);
+
+private:
+    int mNumKernels;
+    int mCenterIdx;
+    Real_t mGammaC;
+    IMatrix_t mKnlIdxRow; // A 2D reference map. Each element of this map records its row index in the gridded, small matrix.
+    IMatrix_t mKnlIdxCol; // A 2D reference map. Each element of this map records its col index in the gridded, small matrix.
+    Mat mVcMat;
+    Mat mTvcMat;
+
+public:
+    friend class Test_WeightColor;
+
+    FRIEND_TEST(Test_WeightColor, average_color_values);
+    FRIEND_TEST(Test_WeightColor, put_wc_01);
+    FRIEND_TEST(Test_WeightColor, put_wc_02);
+
+};
+
+class Test_WeightColor : public ::testing::Test
+{
+protected:
+    static void SetUpTestCase() { }
+
+    static void TearDownTestCase() { }
+
+    virtual void SetUp() { }
+
+    virtual void TearDown() { }
+};
+
 class BilateralWindowMatcher
 {
 public:
-    typedef float Real_t;
     const int OCV_F_TYPE; // Must compatible with Real_t.
-    typedef Matrix<   int, -1, -1, RowMajor> IMatrix_t;
-    typedef Matrix<Real_t, -1, -1, RowMajor> FMatrix_t;
-
+ 
 public:
     BilateralWindowMatcher(int w, int nw);
     ~BilateralWindowMatcher(void);
 
     void show_index_maps(void);
 
-    int get_kernel_size(void);
-    int get_num_kernels_single_side(void);
-    int get_window_width(void);
+    int get_kernel_size(void) const;
+    int get_num_kernels_single_side(void) const;
+    int get_window_width(void) const;
 
     void set_gamma_s(Real_t gs);
-    Real_t get_gamma_s(void);
+    Real_t get_gamma_s(void) const;
 
     void set_gamma_c(Real_t gc);
-    Real_t get_gamma_c(void);
+    Real_t get_gamma_c(void) const;
 
     /**
      * @param refMat Reference image (left).
@@ -196,34 +271,18 @@ public:
     /**
      * @return Buffer size is returned as number of bytes. 
      */
-    size_t get_internal_buffer_szie(void);
+    size_t get_internal_buffer_szie(void) const;
 
     void enable_debug(void);
     void disable_debug(void);
     void debug_set_array_buffer_idx(size_t idx0, size_t idx1 = 0);
     void debug_set_out_dir(const std::string& dir);
 
-protected:
-    /**
-     * @param _src The dimension is (mKernelSize * mNumKernels)^2. _src is assumed to have data type CV_8UC1 or CV_8UC3.
-     * @param _dst The dimension is mNumKernels^2. The data type of _dst is either CV_32FC1 or CV_32FC3.
-     */
-    void put_average_color_values(
-        InputArray _src, OutputArray _dst, InputArray _mask, OutputArray _validCount, OutputArray _tempValidCount);
-
-    /**
-     * @param src Data type is CV_8UC1 or CV_8UC3.
-     * @param bufferS A Mat buffer which has the same height and width of the support window.
-     * 
-     */
-    void put_wc(const Mat& src, const Mat& mask, 
-        FMatrix_t& wc, Mat& avgColor, Mat& vcMat, Mat& tvcMat, Mat* bufferS = NULL);
-
+private:
     template<typename tR, typename tT> Real_t TAD( const tR* pr, const tT* pt, int channels );
 
     template<typename _TR, typename _TT> void TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad);
 
-private:
     /**
      * If size <= mABSize, the arrays will be re-used. If size > mABSize, the
      * array buffers will be deleted first and then allocated. Use argument force to
@@ -235,19 +294,12 @@ private:
     void destroy_array_buffer(void);
     void allocate_array_buffer(size_t size, int matType);
 
-protected:
+private:
     int mKernelSize;
     int mNumKernels; // Number of kernels along one side.
     int mWindowWidth;
 
-    IMatrix_t mIndexMapRow; // A 2D map. Each element of this map records its central row index in the original window.
-    IMatrix_t mIndexMapCol; // A 2D map. Each element of this map records its central col index in the original window.
-
-    IMatrix_t mKnlIdxRow; // A 2D reference map. Each element of this map records its row index in the gridded, small matrix.
-    IMatrix_t mKnlIdxCol; // A 2D reference map. Each element of this map records its col index in the gridded, small matrix.
-
-    IMatrix_t mPntIdxKnlRow; // A 2D index matrix. Each element is the original row index of a single kernel center.
-    IMatrix_t mPntIdxKnlCol; // A 2D index matrix. Each element is the original col index of a single kernel center.
+    IndexMapper mIM; // Index mapper.
 
     FMatrix_t mDistanceMap; // A 2D map. Each element of this map records its distance from the center of the window.
     FMatrix_t mWsMap;
@@ -260,13 +312,14 @@ protected:
 
     Real_t mTAD_T;
 
-private:
     Mat*       mACArrayRef; // AC means average color.
     Mat*       mACArrayTst;
     FMatrix_t* mWCArrayRef; // WC means color weights.
     FMatrix_t* mWCArrayTst;
     size_t     mABSize;     // AB means array buffer.
     size_t     mABMemorySize; // The memory of all array buffers in bytes.
+
+    WeightColor mWCO; // WeightColor object.
 
     bool mFlagDebug;
     size_t mDebug_ABIdx0;
@@ -275,9 +328,12 @@ private:
 
 public:
     friend class Test_BilateralWindowMatcher;
-    FRIEND_TEST(Test_BilateralWindowMatcher, average_color_values);
-    FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_01);
-    FRIEND_TEST(Test_BilateralWindowMatcher, put_wc_02);
+
+    FRIEND_TEST(Test_BilateralWindowMatcher, getter_setter);
+    FRIEND_TEST(Test_BilateralWindowMatcher, half_count);
+    FRIEND_TEST(Test_BilateralWindowMatcher, inner_pixels);
+    FRIEND_TEST(Test_BilateralWindowMatcher, create_array_buffer);
+
 #ifndef OMIT_TESTS
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_01);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_02);
@@ -293,15 +349,12 @@ class Test_BilateralWindowMatcher : public ::testing::Test
 protected:
     static void SetUpTestCase()
     {
-        mBWM = new BilateralWindowMatcher( 3, 13 );
+
     }
 
     static void TearDownTestCase()
     {
-        if ( NULL != mBWM )
-        {
-            delete mBWM; mBWM = NULL;
-        }
+
     }
 
     virtual void SetUp()
@@ -323,7 +376,9 @@ protected:
     }
 
 protected:
-    static BilateralWindowMatcher* mBWM;
+    static const int mDefaultKernelSize;
+    static const int mDefaultNumKernels;
+    static const int mDefaultWindowWidth;
 };
 
 } // namespace slf.
