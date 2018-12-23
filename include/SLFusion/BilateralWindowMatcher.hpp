@@ -157,6 +157,32 @@ typedef float Real_t;
 typedef Matrix<   int, -1, -1, RowMajor> IMatrix_t;
 typedef Matrix<Real_t, -1, -1, RowMajor> FMatrix_t;
 
+class CVType
+{
+public:
+    CVType() {}
+    ~CVType() {}
+
+    static int get_real_number_type( int imageType )
+    {
+        switch ( imageType )
+        {
+            case CV_8UC1:
+            {
+                return sizeof(float) == sizeof(Real_t) ? CV_32FC1 : CV_64FC1;
+            }
+            case CV_8UC3:
+            {
+                return sizeof(float) == sizeof(Real_t) ? CV_32FC3 : CV_64FC3;
+            }
+            default:
+            {
+                EXCEPTION_BAD_ARGUMENT( imageType, "Only supports CV_8UC1 and CV_8UC3." );
+            }
+        }
+    }
+};
+
 class IndexMapper
 {
 public:
@@ -180,6 +206,25 @@ public:
 
     IMatrix_t mPntIdxKnlRow; // A 2D index matrix. Each element is the original row index of a single kernel center.
     IMatrix_t mPntIdxKnlCol; // A 2D index matrix. Each element is the original col index of a single kernel center.
+
+public:
+    friend class Test_IndexMapper;
+
+    FRIEND_TEST(Test_IndexMapper, index_map);
+    FRIEND_TEST(Test_IndexMapper, kernel_index);
+    FRIEND_TEST(Test_IndexMapper, point_index_kernel);
+};
+
+class Test_IndexMapper : public ::testing::Test
+{
+protected:
+    static void SetUpTestCase() { }
+
+    static void TearDownTestCase() { }
+
+    virtual void SetUp() { }
+
+    virtual void TearDown() { }
 };
 
 class WeightColor
@@ -213,9 +258,14 @@ private:
 public:
     friend class Test_WeightColor;
 
+    FRIEND_TEST(Test_WeightColor, assignment_operator);
+    FRIEND_TEST(Test_WeightColor, mat_divide_3_channels);
+    FRIEND_TEST(Test_WeightColor, mat_divide_1_channel);
     FRIEND_TEST(Test_WeightColor, average_color_values);
-    FRIEND_TEST(Test_WeightColor, put_wc_01);
-    FRIEND_TEST(Test_WeightColor, put_wc_02);
+    FRIEND_TEST(Test_WeightColor, average_color_values_mask);
+    FRIEND_TEST(Test_WeightColor, put_wc_all_the_same);
+    FRIEND_TEST(Test_WeightColor, put_wc_special_center);
+    FRIEND_TEST(Test_WeightColor, put_wc_mask);
 
 };
 
@@ -279,6 +329,8 @@ public:
     void debug_set_out_dir(const std::string& dir);
 
 private:
+    void update_ws(void);
+
     template<typename tR, typename tT> Real_t TAD( const tR* pr, const tT* pt, int channels );
 
     template<typename _TR, typename _TT> void TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad);
@@ -294,6 +346,17 @@ private:
     void destroy_array_buffer(void);
     void allocate_array_buffer(size_t size, int matType);
 
+    void debug_in_loop_wc_avg_color( int i,
+        const Mat& ACArrayRef, const Mat& ACArrayTst,
+        const Mat& refMat, const Mat& tstMat, const Mat& refMask, const Mat& tstMask,
+        const FMatrix_t& WCRef, const FMatrix_t& WCTst);
+
+    void debug_in_loop_cost(int i, 
+        Real_t cost, int disp, int idxAvgColorTst, 
+        const Mat& ACRef, const Mat& ACTst,
+        const FMatrix_t& WCRef, const FMatrix_t& WCTst,
+        const FMatrix_t& tad);
+
 private:
     int mKernelSize;
     int mNumKernels; // Number of kernels along one side.
@@ -303,9 +366,8 @@ private:
 
     FMatrix_t mDistanceMap; // A 2D map. Each element of this map records its distance from the center of the window.
     FMatrix_t mWsMap;
-    FMatrix_t mWss; // Square of spacial weights.
-
     FMatrix_t mPntDistKnl; // A small 2D matrix. Each element of this matrix is the referenced distance from a kernel center to the window center.
+    FMatrix_t mWss; // Square of spacial weights.
 
     Real_t mGammaS;
     Real_t mGammaC;
@@ -316,6 +378,8 @@ private:
     Mat*       mACArrayTst;
     FMatrix_t* mWCArrayRef; // WC means color weights.
     FMatrix_t* mWCArrayTst;
+    int*       mPixelIdxRef;
+    int*       mPixelIdxTst;
     size_t     mABSize;     // AB means array buffer.
     size_t     mABMemorySize; // The memory of all array buffers in bytes.
 
@@ -330,9 +394,15 @@ public:
     friend class Test_BilateralWindowMatcher;
 
     FRIEND_TEST(Test_BilateralWindowMatcher, getter_setter);
+    FRIEND_TEST(Test_BilateralWindowMatcher, distance_map);
+    FRIEND_TEST(Test_BilateralWindowMatcher, ws); // Weight space.
+    FRIEND_TEST(Test_BilateralWindowMatcher, wss);
     FRIEND_TEST(Test_BilateralWindowMatcher, half_count);
     FRIEND_TEST(Test_BilateralWindowMatcher, inner_pixels);
     FRIEND_TEST(Test_BilateralWindowMatcher, create_array_buffer);
+    FRIEND_TEST(Test_BilateralWindowMatcher, TADm_same_ref_tst);
+    FRIEND_TEST(Test_BilateralWindowMatcher, TADm_same_ref_tst_random);
+    FRIEND_TEST(Test_BilateralWindowMatcher, TADm_manual);
 
 #ifndef OMIT_TESTS
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_01);

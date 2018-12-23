@@ -26,22 +26,44 @@ put_distance_map(FM_t& rm, const IM_t& knlPntIdxRowMap, const IM_t& knlPntIdxCol
     const int cntCol = knlPntIdxColMap( cntPos, cntPos );
 
     rm = ( 
-          (knlPntIdxRowMap.array() - cntRow).pow(2) 
-        + (knlPntIdxColMap.array() - cntRow).pow(2) 
-        ).sqrt().matrix().cast<R_t>();
+          (knlPntIdxRowMap.cast<R_t>().array() - cntRow).pow(2) 
+        + (knlPntIdxColMap.cast<R_t>().array() - cntCol).pow(2) 
+        ).sqrt().matrix();
 }
 
 static void
-put_Ws_map( const FM_t& distanceMap, double gs, FM_t& Ws)
+put_Ws_map( const FM_t& distanceMap, R_t gs, FM_t& Ws)
 {
     Ws = (-1.0 * distanceMap / gs).array().exp().matrix();
+}
+
+void BilateralWindowMatcher::update_ws(void)
+{
+    put_Ws_map( mDistanceMap, mGammaS, mWsMap );
+
+    // Put point distance of kernels.
+    int idxRow, idxCol;
+    for ( int i = 0; i < mNumKernels; i++ )
+    {
+        for ( int j = 0; j < mNumKernels; j++ )
+        {
+            idxRow = mIM.mPntIdxKnlRow(i, j);
+            idxCol = mIM.mPntIdxKnlCol(i, j);
+
+            mPntDistKnl( i, j ) = mDistanceMap( idxRow, idxCol );
+        }
+    }
+
+    // Calculate mWss.
+    mWss = (mPntDistKnl.array() / (-mGammaS)).exp().square().matrix();
 }
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 : OCV_F_TYPE(CV_32FC1),
   mIM(w, nw),
   mGammaS(1), mGammaC(5), mTAD_T(10000),
-  mACArrayRef(NULL), mACArrayTst(NULL), mWCArrayRef(NULL), mWCArrayTst(NULL), mABSize(0),
+  mACArrayRef(NULL), mACArrayTst(NULL), mWCArrayRef(NULL), mWCArrayTst(NULL), 
+  mPixelIdxRef(NULL), mPixelIdxTst(NULL), mABSize(0),
   mABMemorySize(0),
   mFlagDebug(false), mDebug_ABIdx0(0), mDebug_ABIdx1(0), mDebug_OutDir("./DebugOutDir")
 {
@@ -75,28 +97,12 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 
     mDistanceMap = FMatrix_t(mWindowWidth, mWindowWidth);
     mWsMap       = FMatrix_t(mWindowWidth, mWindowWidth);
-    mWss         = FMatrix_t(mNumKernels, mNumKernels);
     mPntDistKnl  = FMatrix_t(mNumKernels, mNumKernels);
+    mWss         = FMatrix_t(mNumKernels, mNumKernels);
 
     // Put distance map.
     put_distance_map( mDistanceMap, mIM.mIndexMapRow, mIM.mIndexMapCol );
-    put_Ws_map( mDistanceMap, mGammaS, mWsMap );
-
-    // Put point distance of kernels.
-    int idxRow, idxCol;
-    for ( int i = 0; i < nw; i++ )
-    {
-        for ( int j = 0; j < nw; j++ )
-        {
-            idxRow = mIM.mPntIdxKnlRow(i, j);
-            idxCol = mIM.mPntIdxKnlCol(i, j);
-
-            mPntDistKnl( i, j ) = mDistanceMap( idxRow, idxCol );
-        }
-    }
-
-    // Calculate mWss.
-    mWss = (mPntDistKnl.array() / (-mGammaS)).exp().square().matrix();
+    update_ws();
 
     // WeightColor object.
     mWCO = WeightColor( mNumKernels, mIM.mKnlIdxRow, mIM.mKnlIdxCol, mGammaC );
@@ -145,6 +151,7 @@ int BilateralWindowMatcher::get_window_width(void) const
 void BilateralWindowMatcher::set_gamma_s(Real_t gs)
 {
     mGammaS = gs;
+    update_ws();
 }
 
 R_t 
@@ -183,14 +190,14 @@ void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad
 {
     // The rows and cols of ref and tst are assumed to be the same.
     const int channels = ref.channels();
-    const _TR* pRef  = NULL;
-    const _TT* pTst  = NULL;
+    const _TR* pRef    = NULL;
+    const _TT* pTst    = NULL;
 
     R_t temp = 0.0;
 
     int posCol = 0, posColShift = 0;
     int posTad = 0;
-
+    // Clear tad.
     tad.setConstant(0.0);
 
     for ( int i = 0; i < ref.rows; ++i )
@@ -203,11 +210,6 @@ void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad
 
         for ( int j = 0; j < ref.cols; ++j )
         {
-            if ( i == ref.rows/2 && j == ref.cols/2 )
-            {
-                temp = 0.0;
-            }
-
             temp        = 0.0;
             posColShift = posCol;
 
@@ -230,6 +232,8 @@ void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad
 
 void BilateralWindowMatcher::destroy_array_buffer(void)
 {
+    delete [] mPixelIdxTst; mPixelIdxTst = NULL;
+    delete [] mPixelIdxRef; mPixelIdxRef = NULL;
     delete [] mWCArrayTst; mWCArrayTst = NULL; // Delete a NULL pointer won't cause problem.
     delete [] mWCArrayRef; mWCArrayRef = NULL;
     delete [] mACArrayTst; mACArrayTst = NULL;
@@ -307,7 +311,10 @@ void BilateralWindowMatcher::allocate_array_buffer(size_t size, int matType)
     mWCArrayTst = new FM_t[size];
     create_matrix_array( mWCArrayTst, size, mNumKernels, mNumKernels );
 
-    mABMemorySize = ( sizeOfMatEle + sizeof(R_t) ) * mNumKernels * mNumKernels * size;
+    mPixelIdxRef = new int[size];
+    mPixelIdxTst = new int[size];
+
+    mABMemorySize = ( sizeOfMatEle + sizeof(R_t) + sizeof(int) ) * mNumKernels * mNumKernels * size * 2;
 }
 
 size_t BilateralWindowMatcher::get_internal_buffer_szie(void) const
@@ -387,6 +394,81 @@ static int num_inner_pixels(int cols, int minDisp, int halfCount)
     return cols - minDisp - halfCount * 2;
 }
 
+void BilateralWindowMatcher::debug_in_loop_wc_avg_color( int i,
+        const Mat& ACArrayRef, const Mat& ACArrayTst,
+        const Mat& refMat, const Mat& tstMat, const Mat& refMask, const Mat& tstMask,
+        const FMatrix_t& WCRef, const FMatrix_t& WCTst)
+{
+    Mat channelsRef[3], channelsTst[3];
+    split( ACArrayRef, channelsRef );
+    split( ACArrayTst, channelsTst );
+
+    std::string fnTemp = mDebug_OutDir + "/mACArray.yml"; 
+
+    FileStorage fs;
+    fs.open(fnTemp, FileStorage::WRITE);
+    fs << "i" << i
+        << "refC0" << channelsRef[0]
+        << "refC1" << channelsRef[1]
+        << "refC2" << channelsRef[2]
+        << "tstC0" << channelsTst[0]
+        << "tstC1" << channelsTst[1]
+        << "tstC2" << channelsTst[2]
+        << "winMaskRef" << refMask
+        << "winMaskTst" << tstMask
+        << "windowRef" << refMat
+        << "windowTst" << tstMat;
+
+    std::vector<int> jpegParams;
+    jpegParams.push_back(IMWRITE_JPEG_QUALITY);
+    jpegParams.push_back(100);
+
+    fnTemp = mDebug_OutDir + "/windowsRef.jpg";
+    imwrite(fnTemp, refMat, jpegParams);
+    fnTemp = mDebug_OutDir + "/windowsTst.jpg";
+    imwrite(fnTemp, tstMat, jpegParams);
+
+    fnTemp = mDebug_OutDir + "/mWCArray.dat";
+    std::ofstream ofs;
+    ofs.open( fnTemp );
+    ofs << WCRef << std::endl << std::endl << WCTst;
+    ofs.close();
+}
+
+void BilateralWindowMatcher::debug_in_loop_cost(int i, 
+        Real_t cost, int disp, int idxAvgColorTst, 
+        const Mat& ACRef, const Mat& ACTst,
+        const FMatrix_t& WCRef, const FMatrix_t& WCTst,
+        const FMatrix_t& tad)
+{
+    std::string fnTemp;
+
+    fnTemp = mDebug_OutDir + "/mACArray_cost.yml";
+    FileStorage fs;
+    fs.open(fnTemp, FileStorage::WRITE);
+    fs << "i" << i
+        << "tempCost" << cost
+        << "disp" << disp
+        << "idxAvgColorArrayTst" << idxAvgColorTst
+        << "ref" << ACRef
+        << "tst" << ACTst;
+
+    fnTemp = mDebug_OutDir + "/tad.dat";
+    std::ofstream ofs;
+    ofs.open( fnTemp );
+    ofs << tad;
+    ofs.close();
+
+    fnTemp = mDebug_OutDir + "/WCArrayCost.dat";
+    ofs.open( fnTemp );
+    ofs << "ref" << std::endl
+        << WCRef << std::endl
+        << "tst" << std::endl
+        << WCTst;
+
+    std::cout << "tempCost = " << cost << std::endl;
+}
+
 void BilateralWindowMatcher::match_single_line(
         const Mat& refMat, const Mat& tstMat, 
         const Mat& refMask, const Mat& tstMask, 
@@ -445,7 +527,7 @@ void BilateralWindowMatcher::match_single_line(
         EXCEPTION_BAD_ARGUMENT( refMat, "Not enough columns." );
     }
 
-    int halfCount = half_count(mWindowWidth);
+    const int halfCount = half_count(mWindowWidth);
 
     // The input images must have enough rows.
     if ( refMat.rows < mWindowWidth ||
@@ -493,24 +575,31 @@ void BilateralWindowMatcher::match_single_line(
 
     // === Pre-allocation of weights. ===
     // == Pre-allocation of average color. ===
-    create_array_buffer(pixels, refMat.type());
+    create_array_buffer( pixels, CVType::get_real_number_type( refMat.type() ) );
 
+    // =====================================================
     // === Calculate color weights for all valid pixels. ===
+    // =====================================================
 
     int idxRef = minDisp + halfCount, idxTst = halfCount;
+    Range rowRange( rowIdx - halfCount, rowIdx + halfCount + 1 );
+    Range colRangeRef( idxRef - halfCount, idxRef + halfCount + 1 );
+    Range colRangeTst( idxTst - halfCount, idxTst + halfCount + 1 );
+
     Mat windowRef, windowTst;
     Mat winMaskRef, winMaskTst;
-    Range rowRange( rowIdx - halfCount, rowIdx + halfCount + 1 );
 
     for ( int i = 0; i < pixels; ++i )
     {
         // Update the ROIs in refMat and tstMat.
-        Range colRangeRef( idxRef - halfCount, idxRef + halfCount + 1 );
-        Range colRangeTst( idxTst - halfCount, idxTst + halfCount + 1 );
+        colRangeRef.start = idxRef - halfCount;
+        colRangeRef.end   = idxRef + halfCount + 1;
+        colRangeTst.start = idxTst - halfCount;
+        colRangeTst.end   = idxTst + halfCount + 1;
 
-        windowRef = refMat( rowRange, colRangeRef );
-        windowTst = tstMat( rowRange, colRangeTst );
-
+        // Get the image patches and the masks.
+        windowRef  = refMat( rowRange, colRangeRef );
+        windowTst  = tstMat( rowRange, colRangeTst );
         winMaskRef = refMask( rowRange, colRangeRef );
         winMaskTst = tstMask( rowRange, colRangeTst );
 
@@ -519,6 +608,9 @@ void BilateralWindowMatcher::match_single_line(
         // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside mWCO.wc().
         mWCO.wc( windowRef, winMaskRef, mWCArrayRef[i], mACArrayRef[i] );
         mWCO.wc( windowTst, winMaskTst, mWCArrayTst[i], mACArrayTst[i] );
+
+        mPixelIdxRef[i] = idxRef;
+        mPixelIdxTst[i] = idxTst;
 
         // Update indices.
         idxRef++;
@@ -529,46 +621,16 @@ void BilateralWindowMatcher::match_single_line(
         {
             if ( i == mDebug_ABIdx0 )
             {
-                Mat channelsRef[3], channelsTst[3];
-                split( mACArrayRef[i], channelsRef );
-                split( mACArrayTst[i], channelsTst );
-
-                std::string fnTemp = mDebug_OutDir + "/mACArray.yml"; 
-
-                FileStorage fs;
-                fs.open(fnTemp, FileStorage::WRITE);
-                fs << "i" << i
-                   << "refC0" << channelsRef[0]
-                   << "refC1" << channelsRef[1]
-                   << "refC2" << channelsRef[2]
-                   << "tstC0" << channelsTst[0]
-                   << "tstC1" << channelsTst[1]
-                   << "tstC2" << channelsTst[2]
-                   << "winMaskRef" << winMaskRef
-                   << "winMaskTst" << winMaskTst
-                   << "windowRef" << windowRef
-                   << "windowTst" << windowTst;
-
-                std::vector<int> jpegParams;
-                jpegParams.push_back(IMWRITE_JPEG_QUALITY);
-                jpegParams.push_back(100);
-
-                fnTemp = mDebug_OutDir + "/windowsRef.jpg";
-                imwrite(fnTemp, windowRef, jpegParams);
-                fnTemp = mDebug_OutDir + "/windowsTst.jpg";
-                imwrite(fnTemp, windowTst, jpegParams);
-
-                fnTemp = mDebug_OutDir + "/mWCArray.dat";
-                std::ofstream ofs;
-                ofs.open( fnTemp );
-                ofs << mWCArrayRef[i] << std::endl << std::endl << mWCArrayTst[i];
-                ofs.close();
+                debug_in_loop_wc_avg_color( i,
+                    mACArrayRef[i], mACArrayTst[i],
+                    windowRef, windowTst, winMaskRef, winMaskTst,
+                    mWCArrayRef[i], mWCArrayTst[i] );
             }
         }
     }
 
     FM_t tad( mNumKernels, mNumKernels );
-    int idxAvgColorArrayTst = 0; // The index for avgColorArrayTst.
+    int  idxAvgColorArrayTst = 0; // The index for avgColorArrayTst.
     FM_t tempDenominatorMatrix;
     R_t  tempCost = 0.0;
 
@@ -577,9 +639,10 @@ void BilateralWindowMatcher::match_single_line(
     for ( int i = 0; i < pixels; ++i )
     {
         // The index in the original image.
-        idxRef = halfCount + minDisp + i;
-
+        idxRef = mPixelIdxRef[i];
+        // Save the current reference index.
         pMC[i].set_idx_ref( idxRef );
+        pMC[i].reset();
 
         for ( int j = 0; j < numDisp; ++j )
         {
@@ -599,7 +662,7 @@ void BilateralWindowMatcher::match_single_line(
             {
                 if ( i == mDebug_ABIdx0 && j == mDebug_ABIdx1 )
                 {
-                    std::cout << "Debug." << std::endl;
+                    std::cout << "Debug." << std::endl; // This line is for placing a breakpoint.
                 }
             }
 
@@ -610,47 +673,20 @@ void BilateralWindowMatcher::match_single_line(
             tempDenominatorMatrix = ( mWss.array() * mWCArrayRef[i].array() * mWCArrayTst[idxAvgColorArrayTst].array() ).matrix();
 
             tempCost = 
-                ( tempDenominatorMatrix.array() * tad.array() ).sum() / 
-                tempDenominatorMatrix.sum();
+                ( tempDenominatorMatrix.array() * tad.array() ).sum() / tempDenominatorMatrix.sum();
 
             // Save the cost value into pMC.
-            pMC[i].push_back( minDisp + j, tempCost );
+            pMC[i].push_back( idxRef - mPixelIdxTst[idxAvgColorArrayTst], tempCost );
 
             if ( true == mFlagDebug )
             {
                 if ( i == mDebug_ABIdx0 && j == mDebug_ABIdx1 )
                 {
-                    std::string fnTemp;
-
-                    fnTemp = mDebug_OutDir + "/mACArray_cost.yml";
-                    FileStorage fs;
-                    fs.open(fnTemp, FileStorage::WRITE);
-                    fs << "i" << i
-                       << "tempCost" << tempCost
-                       << "disp" << minDisp + j
-                       << "idxAvgColorArrayTst" << idxAvgColorArrayTst
-                       << "ref" << mACArrayRef[i]
-                       << "tst" << mACArrayTst[idxAvgColorArrayTst];
-
-                    fnTemp = mDebug_OutDir + "/mWss.dat";
-                    std::ofstream ofs;
-                    ofs.open( fnTemp );
-                    ofs << mWss;
-                    ofs.close();
-
-                    fnTemp = mDebug_OutDir + "/tad.dat";
-                    ofs.open( fnTemp );
-                    ofs << tad;
-                    ofs.close();
-
-                    fnTemp = mDebug_OutDir + "/WCArrayCost.dat";
-                    ofs.open( fnTemp );
-                    ofs << "ref" << std::endl
-                        << mWCArrayRef[i].array() << std::endl
-                        << "tst" << std::endl
-                        << mWCArrayTst[idxAvgColorArrayTst].array();
-
-                    std::cout << "tempCost = " << tempCost << std::endl;
+                    debug_in_loop_cost(i, 
+                        tempCost, idxRef - mPixelIdxTst[idxAvgColorArrayTst], idxAvgColorArrayTst,
+                        mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst],
+                        mWCArrayRef[i], mWCArrayTst[idxAvgColorArrayTst],
+                        tad);
                 }        
             }
 

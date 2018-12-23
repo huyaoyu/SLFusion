@@ -108,8 +108,8 @@ static void mat_divide(const Mat& n, const Mat& d, Mat& dst)
 
     for ( int i = 0; i < n.rows; ++i )
     {
-        pN = n.ptr<_TN>(i);
-        pD = d.ptr<_TD>(i);
+        pN =   n.ptr<_TN>(i);
+        pD =   d.ptr<_TD>(i);
         pT = dst.ptr<_TT>(i);
 
         posN = 0;
@@ -134,13 +134,11 @@ void WeightColor::put_average_color_values(
     // Make sure the input Mat object has a depth of CV_8U.
     CV_Assert( CV_8U == src.depth() );
 
-    const int channels = src.channels();
-
     // Create a new Mat for the output.
+    const int channels = src.channels();
     Mat dst;
     if ( 3 == channels )
     {
-        // std::cout << "mNumKernals = " << mNumKernels << std::endl;
         _dst.create( mNumKernels, mNumKernels, CV_32FC3 );
         dst = _dst.getMat();
     }
@@ -158,9 +156,9 @@ void WeightColor::put_average_color_values(
     // Clear data in dst.
     dst.setTo( Scalar::all(0.0) );
 
-    // Loop over every individual pixel in _src.
+    // Loop over every individual pixel in src.
     uchar* pS = NULL;
-    float* pD = NULL;
+    R_t*   pD = NULL;
     int kernelIndexRow = 0, kernelIndexCol = 0;
     int pos = 0;
     int* const knlIdxRow = mKnlIdxRow.data();
@@ -236,23 +234,20 @@ void WeightColor::wc(const Mat& src, const Mat& mask, FMatrix_t& wc, Mat& avgCol
     int pos              = 0;
     int posCol           = 0;
     const int channels   = src.channels();
-
     Real_t colorDiff     = 0.0;
     Real_t colorDist     = 0.0; // Color distance. L2 distance.
-
-    Real_t colorSrc[3]   = {0.0, 0.0, 0.0};
-    int centerIdx        = (mNumKernels - 1) / 2;
-
+    Real_t colorSrc[3]   = { 0.0, 0.0, 0.0 };
     Real_t* pWC          = wc.data();
-
     uchar* pVC           = NULL;
 
-    pAvgColorVal = avgColor.ptr<Real_t>( centerIdx );
+    // Get the color at the center.
+    pAvgColorVal = avgColor.ptr<Real_t>( mCenterIdx );
     for ( int i = 0; i < channels; ++i )
     {
-        colorSrc[i] = *( pAvgColorVal + centerIdx*channels + i );
+        colorSrc[i] = *( pAvgColorVal + mCenterIdx*channels + i );
     }
 
+    // Calculate the weight color values.
     for ( int i = 0; i < avgColor.rows; ++i )
     {
         pAvgColorVal = avgColor.ptr<Real_t>( i );
@@ -288,3 +283,55 @@ void WeightColor::wc(const Mat& src, const Mat& mask, FMatrix_t& wc, Mat& avgCol
         }
     }
 }
+
+#ifdef TEST_SECTION
+
+TEST_F(Test_WeightColor, mat_divide_3_channels)
+{
+    // Create OpenCV mats.
+    Mat n( 3, 3, CV_32FC3 );
+    Mat d( n.size(), CV_8UC1 );
+    Mat r( n.size(), n.type() );
+
+    n.setTo( Scalar::all( 0 ) );
+    d.setTo( Scalar::all( 1 ) );
+
+    n.at<Vec3f>(0, 0) = Vec3f( 300, 300, 300 ); d.at<uchar>(0, 0) = 3;
+    n.at<Vec3f>(0, 2) = Vec3f( 300, 600, 900 ); d.at<uchar>(0, 2) = 3;
+    n.at<Vec3f>(2, 0) = Vec3f(  27,  36,  45 ); d.at<uchar>(2, 0) = 9;
+    n.at<Vec3f>(2, 2) = Vec3f(  27,  36,  45 ); d.at<uchar>(2, 2) = 9;
+
+    mat_divide<R_t, uchar, R_t>(n, d, r);
+
+    ASSERT_EQ( r.at<Vec3f>(0, 0), Vec3f( 100, 100, 100 ) ) << " (300, 300, 300) average on 3";
+    ASSERT_EQ( r.at<Vec3f>(0, 2), Vec3f( 100, 200, 300 ) ) << " (300, 600, 900) average on 3";
+    ASSERT_EQ( r.at<Vec3f>(2, 0), Vec3f(   3,   4,   5 ) ) << " ( 27,  36,  45) average on 9";
+    ASSERT_EQ( r.at<Vec3f>(2, 2), Vec3f(   3,   4,   5 ) ) << " ( 27,  36,  45) average on 9";
+    ASSERT_EQ( r.at<Vec3f>(1, 1), Vec3f(   0,   0,   0 ) ) << " (  0,   0,   0) average on 1";
+}
+
+TEST_F(Test_WeightColor, mat_divide_1_channel)
+{
+    // Create OpenCV mats.
+    Mat n( 3, 3, CV_32FC1 );
+    Mat d( n.size(), CV_8UC1 );
+    Mat r( n.size(), n.type() );
+
+    n.setTo( Scalar::all( 0 ) );
+    d.setTo( Scalar::all( 1 ) );
+
+    n.at<R_t>(0, 0) = 300; d.at<uchar>(0, 0) = 3;
+    n.at<R_t>(0, 2) = 300; d.at<uchar>(0, 2) = 6;
+    n.at<R_t>(2, 0) =  27; d.at<uchar>(2, 0) = 3;
+    n.at<R_t>(2, 2) =  27; d.at<uchar>(2, 2) = 9;
+
+    mat_divide<R_t, uchar, R_t>(n, d, r);
+
+    ASSERT_EQ( r.at<R_t>(0, 0), R_t(100) ) << " 300 average on 3";
+    ASSERT_EQ( r.at<R_t>(0, 2), R_t( 50) ) << " 300 average on 6";
+    ASSERT_EQ( r.at<R_t>(2, 0), R_t(  9) ) << "  27 average on 3";
+    ASSERT_EQ( r.at<R_t>(2, 2), R_t(  3) ) << "  27 average on 9";
+    ASSERT_EQ( r.at<R_t>(1, 1), R_t(  0) ) << "   0 average on 1";
+}
+
+#endif

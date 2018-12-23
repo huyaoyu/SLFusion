@@ -38,6 +38,62 @@ TEST_F( Test_BilateralWindowMatcher, getter_setter )
     ASSERT_EQ( bwm.get_gamma_s(), 19.0 ) << "gamma_s";
 }
 
+TEST_F( Test_BilateralWindowMatcher, distance_map )
+{
+    // Create an object to work with.
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
+
+    int last   = bwm.get_window_width() - 1;
+    int center = last / 2; 
+    R_t eps    = 1e-5;
+    R_t dist0  = 25.45584412271571;
+
+    ASSERT_EQ( bwm.mDistanceMap(center, center), 0 ) << "The center distance is zero.";
+    ASSERT_LT( fabs( ( bwm.mDistanceMap(0, 0) - dist0 ) / dist0 ), eps ) << "The upper left corner.";
+    ASSERT_LT( fabs( ( bwm.mDistanceMap(last, last) - dist0 ) / dist0 ), eps ) << "The bottom right corner.";
+
+    ASSERT_EQ( bwm.mDistanceMap(0, 0), bwm.mDistanceMap(1, 1) ) << " (0, 0) and (1, 1) have the same distance.";
+    ASSERT_EQ( bwm.mDistanceMap(last, last), bwm.mDistanceMap( last - 1, last - 1) ) << " (last, last) and (last - 1, last - 1) have the same distance.";
+}
+
+TEST_F( Test_BilateralWindowMatcher, ws )
+{
+    // Create an object to work with.
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
+    bwm.set_gamma_s( 25 );
+
+    int last   = bwm.get_window_width() - 1;
+    int center = last / 2; 
+    R_t eps    = 1e-5;
+    R_t ws0    = 0.3612323983950063;
+
+    ASSERT_EQ( bwm.mWsMap(center, center), 1 ) << "The center ws is 1.";
+    ASSERT_LT( fabs( ( bwm.mWsMap(0, 0) - ws0 ) / ws0 ), eps ) << "The upper left corner.";
+    ASSERT_LT( fabs( ( bwm.mWsMap(last, last) - ws0 ) / ws0 ), eps ) << "The bottom right corner.";
+
+    ASSERT_EQ( bwm.mWsMap(0, 0), bwm.mWsMap(1, 1) ) << " (0, 0) and (1, 1) have the same ws.";
+    ASSERT_EQ( bwm.mWsMap(last, last), bwm.mWsMap( last - 1, last - 1) ) << " (last, last) and (last - 1, last - 1) have the same ws.";
+}
+
+TEST_F( Test_BilateralWindowMatcher, wss )
+{
+    // Create an object to work with.
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
+    bwm.set_gamma_s( 25 );
+
+    int last   = bwm.get_num_kernels_single_side() - 1;
+    int center = last / 2; 
+    R_t eps    = 1e-5;
+    R_t wss0   = 0.13048884565020857;
+
+    ASSERT_EQ( bwm.mWss(center, center), 1 ) << "The center ws is 1.";
+    ASSERT_LT( fabs( ( bwm.mWss(0, 0) - wss0 ) / wss0 ), eps ) << "The upper left corner.";
+    ASSERT_LT( fabs( ( bwm.mWss(last, last) - wss0 ) / wss0 ), eps ) << "The bottom right corner.";
+
+    ASSERT_EQ( bwm.mWss(0, 0), bwm.mWss(0, last) ) << " (0, 0) and (0, last) have the same wss.";
+    ASSERT_EQ( bwm.mWss(last, 0), bwm.mWss( last, last) ) << " (last, 0) and (last, last) have the same wss.";
+}
+
 TEST_F( Test_BilateralWindowMatcher, create_array_buffer )
 {
     // Create an object to work with.
@@ -119,6 +175,112 @@ TEST_F( Test_BilateralWindowMatcher, create_array_buffer )
     ASSERT_NE( tempWCArrayRef, (void*)(bwm.mWCArrayRef) ) << "After forcing creation of mWCArrayRef with smaller size.";
     ASSERT_NE( tempWCArrayTst, (void*)(bwm.mWCArrayTst) ) << "After forcing creation of mWCArrayTst with smaller size.";
     ASSERT_EQ( bwm.mABSize, size ) << "mABSize remains the same after forcing creation without changing the size.";
+}
+
+TEST_F( Test_BilateralWindowMatcher, TADm_same_ref_tst )
+{
+    // Create an object to work with.
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
+
+    // Create an input windows.
+    Mat windowRef( mDefaultNumKernels, mDefaultNumKernels, CV_32FC3 );
+    windowRef.setTo( Scalar::all( 255 ) );
+
+    Mat windowTst( windowRef.size(), windowRef.type() );
+    windowRef.copyTo( windowTst );
+
+    // Create the tad variable.
+    FM_t tad( mDefaultNumKernels, mDefaultNumKernels );
+
+    // Calculate TAD.
+    bwm.TADm<R_t, R_t>( windowRef, windowTst, tad );
+    stringstream ss;
+
+    for ( int i = 0; i < mDefaultNumKernels; ++i )
+    {
+        for ( int j = 0; j < mDefaultNumKernels; ++j )
+        {
+            ss.str(""); ss.clear();
+            ss << "( " << i << ", " << j << ").";
+
+            ASSERT_EQ( tad(i, j), 0 ) << ss.str();
+        }
+    }
+}
+
+TEST_F( Test_BilateralWindowMatcher, TADm_same_ref_tst_random )
+{
+    // Create an object to work with.
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
+
+    // Create an input windows.
+    Mat windowRef( mDefaultNumKernels, mDefaultNumKernels, CV_32FC3 );
+    // Randomize windowRef.
+    randu( windowRef, Scalar( 0, 0, 0 ), Scalar( 256, 256, 256 ) );
+
+    Mat windowTst( windowRef.size(), windowRef.type() );
+    windowRef.copyTo( windowTst );
+
+    // Create the tad variable.
+    FM_t tad( mDefaultNumKernels, mDefaultNumKernels );
+
+    // Calculate TAD.
+    bwm.TADm<R_t, R_t>( windowRef, windowTst, tad );
+    stringstream ss;
+    R_t eps = 1e-5;
+
+    for ( int i = 0; i < mDefaultNumKernels; ++i )
+    {
+        for ( int j = 0; j < mDefaultNumKernels; ++j )
+        {
+            ss.str(""); ss.clear();
+            ss << "( " << i << ", " << j << ").";
+
+            ASSERT_LT( std::fabs( tad(i, j) ), eps ) << ss.str();
+        }
+    }
+}
+
+TEST_F( Test_BilateralWindowMatcher, TADm_manual )
+{
+    // Create an object to work with.
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
+
+    // Create an input windows.
+    Mat windowRef( mDefaultNumKernels, mDefaultNumKernels, CV_32FC3 );
+    windowRef.setTo( Scalar::all( 255 ) );
+
+    Mat windowTst( windowRef.size(), windowRef.type() );
+    windowRef.copyTo( windowTst );
+
+    // Modify elements of windowRef.
+    windowRef.at<Vec3f>( 0, 0 ) = Vec3f(  50, 100, 150 );
+    windowTst.at<Vec3f>( 0, 0 ) = Vec3f( 130,  80, 200 );
+
+    // Create the tad variable.
+    FM_t tad( mDefaultNumKernels, mDefaultNumKernels );
+
+    // Calculate TAD.
+    bwm.TADm<R_t, R_t>( windowRef, windowTst, tad );
+    stringstream ss;
+    R_t eps = 1e-5;
+    R_t first = sqrt( 80*80 + 20*20 + 50*50 );
+
+    ASSERT_LT( fabs( ( tad(0,0) - first ) / first ), eps ) << "The first element of tad shoudl equal the specified value.";
+
+    for ( int i = 0; i < mDefaultNumKernels; ++i )
+    {
+        for ( int j = 0; j < mDefaultNumKernels; ++j )
+        {
+            ss.str(""); ss.clear();
+            ss << "( " << i << ", " << j << ").";
+
+            if ( i != 0 && j != 0 )
+            {
+                ASSERT_LT( std::fabs( tad(i, j) ), eps ) << ss.str();
+            }
+        }
+    }
 }
 
 #ifndef OMIT_TESTS
