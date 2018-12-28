@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <eigen3/Eigen/Dense>
 #include <opencv2/core.hpp>
@@ -412,6 +413,7 @@ public:
 #endif
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_06);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_gradient);
 };
 
 class Test_BilateralWindowMatcher : public ::testing::Test
@@ -444,6 +446,9 @@ protected:
         //     delete mBWM; mBWM = NULL;
         // }
     }
+
+    static void create_gradient_image( OutputArray _dst, int height, int width, 
+        const std::vector<int>& b, const std::vector<int>& g, const std::vector<int>& r );
 
 protected:
     static const int mDefaultKernelSize;

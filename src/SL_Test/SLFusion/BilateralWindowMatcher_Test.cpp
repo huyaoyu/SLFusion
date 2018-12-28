@@ -421,6 +421,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_01)
             }
         }
     }
+
+    delete [] mcArray; mcArray = NULL;
 }
 
 TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
@@ -567,6 +569,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_02)
             }
         }
     }
+
+    delete [] mcArray; mcArray = NULL;
 }
 
 TEST_F(Test_BilateralWindowMatcher, match_single_line_03)
@@ -686,6 +690,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_03)
     {
         mcArray[i].write(mcDir);
     }
+
+    delete [] mcArray; mcArray = NULL;
 }
 
 TEST_F(Test_BilateralWindowMatcher, match_single_line_04)
@@ -788,6 +794,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_04)
     {
         mcArray[i].write(mcDir);
     }
+
+    delete [] mcArray; mcArray = NULL;
 }
 
 #endif
@@ -901,6 +909,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
     {
         mcArray[i].write(mcDir);
     }
+
+    delete [] mcArray; mcArray = NULL;
 }
 
 template <typename _T> 
@@ -1045,6 +1055,111 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_06)
     {
         mcArray[i].write(mcDir);
     }
+
+    delete [] mcArray; mcArray = NULL;
+}
+
+void Test_BilateralWindowMatcher::create_gradient_image( OutputArray _dst, int height, int width, 
+        const vector<int>& b, const vector<int>& g, const vector<int>& r )
+{
+    _dst.create( height, width, CV_8UC3 );
+    Mat dst = _dst.getMat();
+
+    const float stepB = 1.0 * ( b[1] - b[0] ) / ( width - 1 );
+    const float stepG = 1.0 * ( g[1] - g[0] ) / ( width - 1 );
+    const float stepR = 1.0 * ( r[1] - r[0] ) / ( width - 1 );
+
+    int pixel[3] = {0, 0, 0};
+
+    Mat line( 1, width, CV_8UC3 );
+
+    for ( int i = 0; i < width; ++i )
+    {
+        pixel[0] = (int)( b[0] + stepB * i );
+        pixel[1] = (int)( g[0] + stepG * i );
+        pixel[2] = (int)( r[0] + stepR * i );
+
+        line.at<Vec3b>(0, i) = Vec3b( pixel[0], pixel[1], pixel[2] );
+    }
+
+    for ( int i = 0; i < height; ++i )
+    {
+        line.copyTo( dst( Rect( 0, i, width, 1 ) ) );
+    }
+}
+
+TEST_F( Test_BilateralWindowMatcher, match_single_line_gradient )
+{
+    // Create a gradient 3-channel image.
+    const int kernelSize  = 3;
+    const int numKernels  = 13;
+    const int windowWidth = kernelSize * numKernels;
+    const int width       = windowWidth * 2;
+    const int height      = windowWidth;
+    const int low         = 1;
+    const int high        = 255;
+
+    Mat img1( height, width, CV_8UC3 );
+    vector<int> rangeB{ low, high };
+    vector<int> rangeG{ low, high };
+    vector<int> rangeR{ low, high };
+
+    create_gradient_image(img1, height, width, rangeB, rangeG, rangeR);
+
+    // Save the image to file system.
+    vector<int> jpegParams{ IMWRITE_JPEG_QUALITY, 100 };
+    imwrite( "./GradientWindow.jpg", img1, jpegParams );
+
+    // img0.
+    Mat img0(img1.size(), img1.type());
+
+    const int left = ( width - windowWidth ) / 2;
+    cout << "left = " << left << endl;
+    img0.setTo( Scalar::all(0) );
+    img1( Rect( left, 0, windowWidth, height ) ).copyTo( img0( Rect( left + left, 0, windowWidth, height ) ) );
+
+    imwrite( "./GradientWindow_Block.jpg", img0, jpegParams );
+
+    // Padding.
+    Mat padded[2], paddedMask[2], gray0, mask0;
+    Scalar s = Scalar(0, 0, 0);
+
+    Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded[0], paddedMask[0]);
+    Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded[1], paddedMask[1]);
+
+    cvtColor(padded[0], gray0, COLOR_BGR2GRAY );
+    threshold( gray0, mask0, 0, 255, THRESH_BINARY );
+
+    const int minDisparity = 1;
+    const int maxDisparity = 100;
+    const int numDisparity = maxDisparity - minDisparity + 1;
+    const int pixels       = padded[0].cols - minDisparity - ( kernelSize * numKernels - 1 );
+
+    cout << "pixels = " << pixels << endl;
+
+    // Pre-allocations.
+    MatchingCost<R_t>* mcArray = new MatchingCost<R_t>[ pixels ];
+    for ( int i = 0; i < pixels; ++i )
+    {
+        mcArray[i].allocate(numDisparity);
+    }
+
+    // Create the matcher.
+    BilateralWindowMatcher bwm( kernelSize, numKernels );
+
+    bwm.match_single_line( padded[0], padded[1], mask0, paddedMask[1],
+        padded[0].rows / 2, minDisparity, maxDisparity, mcArray);
+
+    string mcDir = "../data/SLFusion/match_single_line_gradient_cost";
+
+    cout << "Write matching costs to filesystem..." << endl;
+
+    for ( int i = 0; i < pixels; ++i )
+    {
+        mcArray[i].write(mcDir);
+    }
+
+    delete [] mcArray; mcArray = NULL;
 }
 
 }
