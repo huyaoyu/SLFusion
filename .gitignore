@@ -7,4 +7,5 @@ data/
 *.png
 *.pyc
 *.tif
+*.m~
 

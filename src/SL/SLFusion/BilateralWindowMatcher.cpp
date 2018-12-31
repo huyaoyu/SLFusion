@@ -1,10 +1,13 @@
+#include <boost/filesystem.hpp>
 #include <cmath>
 #include <fstream>
 #include <vector>
 
+#include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
 #include "SLFusion/BilateralWindowMatcher.hpp"
+#include "SLFusion/SLCommon.hpp"
 
 using namespace cv;
 using namespace Eigen;
@@ -338,9 +341,25 @@ void BilateralWindowMatcher::debug_set_array_buffer_idx(size_t idx0, size_t idx1
     mDebug_ABIdx1 = idx1;
 }
 
+static void test_create_directory(const std::string& dn)
+{
+    namespace fs = boost::filesystem;
+
+    fs::path d(dn);
+
+    if ( false == fs::is_directory(d) )
+    {
+        // Create the directory.
+        fs::create_directories(d);
+        std::cout << "Directory " << dn << " is not exist. Create new directory." << std::endl;
+    }
+}
+
 void BilateralWindowMatcher::debug_set_out_dir(const std::string& dir)
 {
     mDebug_OutDir = dir;
+
+    test_create_directory(mDebug_OutDir);
 }
 
 void BilateralWindowMatcher::create_array_buffer(size_t size, int matType, bool force)
@@ -394,17 +413,83 @@ static int num_inner_pixels(int cols, int minDisp, int halfCount)
     return cols - minDisp - halfCount * 2;
 }
 
+template <typename _T, typename _D> 
+static void write_mat_matlab_format(const std::string& path, const std::string& name, const Mat& m, int iFlag = 0, int w = 3)
+{
+    const int channels = m.channels();
+    Mat* cArray = new Mat[channels];
+
+    // Split m into separated channels.
+    split( m, cArray );
+
+    // describe_ocv_mat( cArray[0], "cArray[0]" );
+
+    // Test the path.
+    test_create_directory(path);
+
+    // Prepare filename and output file stream.
+    std::stringstream ssFn;
+    std::ofstream ofs;
+    const _T* p = NULL; // The pointer to the row header of splited channel.
+
+    // Save the files.
+    for ( int c = 0; c < channels; ++c )
+    {
+        // Filename.
+        ssFn.str(""); ssFn.clear(); ssFn << path << "/" << name << "_" << c << ".dat";
+        ofs.open( ssFn.str() );
+        if ( 0 == iFlag )
+        {
+            ofs.precision(w);
+        }
+
+        // Loop over every element of one channel.
+        for ( int i = 0; i < m.rows; ++i )
+        {
+            p = cArray[c].ptr<_T>(i);
+
+            for ( int j = 0; j < m.cols; ++j )
+            {
+                if ( 0 == iFlag )
+                {
+                    ofs << std::scientific << (_D)( p[j] ) << " ";
+                }
+                else
+                {
+                    ofs << std::setw(w) << (_D)( p[j] ) << " ";
+                }
+                
+            }
+
+            ofs << std::endl;
+        }
+
+        ofs.close();
+    }
+
+    delete [] cArray; cArray = NULL;
+}
+
+#define DESCRIBE_OCV_MAT(M) \
+    describe_ocv_mat( M, #M )
+
 void BilateralWindowMatcher::debug_in_loop_wc_avg_color( int i,
         const Mat& ACArrayRef, const Mat& ACArrayTst,
         const Mat& refMat, const Mat& tstMat, const Mat& refMask, const Mat& tstMask,
         const FMatrix_t& WCRef, const FMatrix_t& WCTst)
 {
+    // Split ACArrayRef and ACArrayTst into separated channels.
     Mat channelsRef[3], channelsTst[3];
     split( ACArrayRef, channelsRef );
     split( ACArrayTst, channelsTst );
 
-    std::string fnTemp = mDebug_OutDir + "/mACArray.yml"; 
+    // Prepare saving path.
+    std::stringstream ssPath;
+    ssPath << mDebug_OutDir << "/ac_" << std::setfill('0') << std::setw(4) << i;
+    test_create_directory( ssPath.str() );
+    std::string fnTemp  = ssPath.str() + "/mACArray.yml"; 
 
+    // Save averaged color values, masks, and the original input windows into a yaml file.
     FileStorage fs;
     fs.open(fnTemp, FileStorage::WRITE);
     fs << "i" << i
@@ -414,24 +499,38 @@ void BilateralWindowMatcher::debug_in_loop_wc_avg_color( int i,
         << "tstC0" << channelsTst[0]
         << "tstC1" << channelsTst[1]
         << "tstC2" << channelsTst[2]
-        << "winMaskRef" << refMask
-        << "winMaskTst" << tstMask
-        << "windowRef" << refMat
-        << "windowTst" << tstMat;
+        << "refMask" << refMask
+        << "tstMask" << tstMask
+        << "refMat" << refMat
+        << "tstMat" << tstMat;
 
-    std::vector<int> jpegParams;
-    jpegParams.push_back(IMWRITE_JPEG_QUALITY);
-    jpegParams.push_back(100);
+    // Save matlab format files.
+    // DESCRIBE_OCV_MAT(refMat);
+    write_mat_matlab_format<uchar, int>( ssPath.str(), "windowRef", refMat, 1, 3 );
+    write_mat_matlab_format<uchar, int>( ssPath.str(), "windowTst", tstMat, 1, 3 );
+    write_mat_matlab_format<uchar, int>( ssPath.str(), "maskRef", refMask, 1, 3 );
+    write_mat_matlab_format<uchar, int>( ssPath.str(), "maskTst", tstMask, 1, 3 );
+    write_mat_matlab_format<R_t, R_t>( ssPath.str(), "acRef", ACArrayRef );
+    write_mat_matlab_format<R_t, R_t>( ssPath.str(), "acTst", ACArrayTst );
 
-    fnTemp = mDebug_OutDir + "/windowsRef.jpg";
+    // Save the two input windows into image files.
+    std::vector<int> jpegParams{ IMWRITE_JPEG_QUALITY, 100 };
+    fnTemp = ssPath.str() + "/windowsRef.jpg";
     imwrite(fnTemp, refMat, jpegParams);
-    fnTemp = mDebug_OutDir + "/windowsTst.jpg";
+    fnTemp = ssPath.str() + "/windowsTst.jpg";
     imwrite(fnTemp, tstMat, jpegParams);
-
-    fnTemp = mDebug_OutDir + "/mWCArray.dat";
+    
+    // Save weight color values into plain text files.
+    fnTemp = ssPath.str() + "/WCRef.dat";
     std::ofstream ofs;
+
     ofs.open( fnTemp );
-    ofs << WCRef << std::endl << std::endl << WCTst;
+    ofs << WCRef << std::endl;
+    ofs.close();
+
+    fnTemp = ssPath.str() + "/WCTst.dat";
+    ofs.open( fnTemp );
+    ofs << WCTst << std::endl;
     ofs.close();
 }
 
@@ -441,9 +540,13 @@ void BilateralWindowMatcher::debug_in_loop_cost(int i,
         const FMatrix_t& WCRef, const FMatrix_t& WCTst,
         const FMatrix_t& tad)
 {
+    std::stringstream ssPath;
+    ssPath << mDebug_OutDir << "/lc_" 
+           << std::setfill('0') << std::setw(4) << i << "/" 
+           << std::setfill('0') << std::setw(4) << disp;
+    test_create_directory( ssPath.str() );
     std::string fnTemp;
-
-    fnTemp = mDebug_OutDir + "/mACArray_cost.yml";
+    fnTemp = ssPath.str() + "/mACArray_cost.yml";
     FileStorage fs;
     fs.open(fnTemp, FileStorage::WRITE);
     fs << "i" << i
@@ -453,18 +556,26 @@ void BilateralWindowMatcher::debug_in_loop_cost(int i,
         << "ref" << ACRef
         << "tst" << ACTst;
 
-    fnTemp = mDebug_OutDir + "/tad.dat";
+    write_mat_matlab_format<R_t, R_t>( ssPath.str(), "ACRef", ACRef );
+    write_mat_matlab_format<R_t, R_t>( ssPath.str(), "ACTst", ACTst );
+    write_floating_point_mat_as_byte( ssPath.str() + "/ACRef", ACRef );
+    write_floating_point_mat_as_byte( ssPath.str() + "/ACTst", ACTst );
+
+    fnTemp = ssPath.str() + "/tad.dat";
     std::ofstream ofs;
     ofs.open( fnTemp );
     ofs << tad;
     ofs.close();
 
-    fnTemp = mDebug_OutDir + "/WCArrayCost.dat";
+    fnTemp = ssPath.str() + "/WCRef.dat";
     ofs.open( fnTemp );
-    ofs << "ref" << std::endl
-        << WCRef << std::endl
-        << "tst" << std::endl
-        << WCTst;
+    ofs << WCRef << std::endl;
+    ofs.close();
+
+    fnTemp = ssPath.str() + "/WCTst.dat";
+    ofs.open( fnTemp );
+    ofs << WCTst << std::endl;
+    ofs.close();
 
     std::cout << "tempCost = " << cost << std::endl;
 }
@@ -680,7 +791,7 @@ void BilateralWindowMatcher::match_single_line(
 
             if ( true == mFlagDebug )
             {
-                if ( i == mDebug_ABIdx0 && j == mDebug_ABIdx1 )
+                if ( i == mDebug_ABIdx0 )
                 {
                     debug_in_loop_cost(i, 
                         tempCost, idxRef - mPixelIdxTst[idxAvgColorArrayTst], idxAvgColorArrayTst,

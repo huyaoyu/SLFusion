@@ -841,8 +841,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
         imwrite( "../data/SLFusion/match_single_line_05_cost/img1.jpg", img1, jpegParams );
         
         // Convert to CIELab color space.
-        // cvtColor( img0, img0, COLOR_BGR2Lab );
-        // cvtColor( img1, img1, COLOR_BGR2Lab );
+        cvtColor( img0, img0, COLOR_BGR2Lab );
+        cvtColor( img1, img1, COLOR_BGR2Lab );
 
         // Padding.
         Mat padded[2], paddedMask[2];
@@ -877,15 +877,15 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
 
         // Calculate matching cost.
         
-        bwm.enable_debug();
-        bwm.debug_set_array_buffer_idx(3095, 1);
+        // bwm.enable_debug();
+        // bwm.debug_set_array_buffer_idx(3095, 1);
 
         bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
-            ( kernelSize * numKernels - 1 )/2 + img0.rows / 2 - 100, minDisparity, maxDisparity, mcArray);
+            padded[0].rows / 2, minDisparity, maxDisparity, mcArray);
         cout << "Internal buffer size of BilateralWindowMatcher: " 
              << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
-        bwm.disable_debug();
+        // bwm.disable_debug();
 
         // Verify the matching cost.
     }
@@ -1151,6 +1151,112 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_gradient )
         padded[0].rows / 2, minDisparity, maxDisparity, mcArray);
 
     string mcDir = "../data/SLFusion/match_single_line_gradient_cost";
+
+    cout << "Write matching costs to filesystem..." << endl;
+
+    for ( int i = 0; i < pixels; ++i )
+    {
+        mcArray[i].write(mcDir);
+    }
+
+    delete [] mcArray; mcArray = NULL;
+}
+
+TEST_F( Test_BilateralWindowMatcher, match_single_line_mb_tsukuba )
+{
+    using namespace std;
+
+    BilateralWindowMatcher bwm( 3, 13 );
+
+    // Read 1 image.
+    Mat img0, img1;
+
+    vector<int> jpegParams { IMWRITE_JPEG_QUALITY, 100 };
+
+    const int kernelSize  = 3;
+    const int numKernels  = 13;
+    const int windowWidth = kernelSize * numKernels;
+
+    // Define the disparity range.
+    const int minDisparity = 1;
+    const int maxDisparity = 100;
+    const int numDisparity = maxDisparity - minDisparity + 1;
+    int pixels = 0;
+
+    MatchingCost<R_t>* mcArray = NULL;
+
+    try
+    {
+        img0 = imread( "../data/SLFusion/match_single_line_mb_tsukuba/left.jpg",  IMREAD_COLOR );
+        img1 = imread( "../data/SLFusion/match_single_line_mb_tsukuba/right.jpg", IMREAD_COLOR );
+
+        cout << "img0.rows = " << img0.rows << ", "
+             << "img0.cols = " << img0.cols 
+             << endl;
+        
+        // Convert to CIELab color space.
+        // cvtColor( img0, img0, COLOR_BGR2Lab );
+        // cvtColor( img1, img1, COLOR_BGR2Lab );
+
+        // Padding.
+        Mat padded[2], paddedMask[2];
+        Scalar s = Scalar(0, 0, 0);
+        if ( 0 != Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded[0], paddedMask[0]) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        if ( 0 != Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded[1], paddedMask[1]) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        cout << "Size of padded: (" << padded[0].rows << ", " << padded[0].cols << ")" << endl;
+
+        imwrite( "../data/SLFusion/match_single_line_06_cost/padded_0.jpg", padded[0], jpegParams );
+        imwrite( "../data/SLFusion/match_single_line_06_cost/padded_1.jpg", padded[1], jpegParams );
+
+        pixels = padded[0].cols - minDisparity - ( kernelSize * numKernels - 1 );
+
+        cout << "pixels = " << pixels << endl;
+
+        // Pre-allocations.
+        mcArray = new MatchingCost<R_t>[ pixels ];
+        for ( int i = 0; i < pixels; ++i )
+        {
+            mcArray[i].allocate(numDisparity);
+        }
+
+        cout << "Estimated memory: " << mcArray[0].estimate_storage() * (pixels) / 1024.0 / 1024 << " MB." << endl;
+
+        // Calculate matching cost.
+        
+        bwm.enable_debug();
+        bwm.debug_set_out_dir("../data/SLFusion/match_single_line_mb_tsukuba");
+        bwm.debug_set_array_buffer_idx(176, 0);
+
+        bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+            padded[0].rows / 2, minDisparity, maxDisparity, mcArray);
+        cout << "Internal buffer size of BilateralWindowMatcher: " 
+             << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
+
+        bwm.disable_debug();
+
+        // Verify the matching cost.
+    }
+    catch ( exception& exp )
+    {
+        delete [] mcArray; mcArray = NULL;
+
+        cout << "wat() " << exp.what() << endl;
+        ASSERT_FALSE(true);
+    }
+
+    const int halfCount = ( kernelSize * numKernels - 1 )/2;
+    int nTst = 0;
+
+    // Output the results.
+    string mcDir = "../data/SLFusion/match_single_line_mb_tsukuba";
 
     cout << "Write matching costs to filesystem..." << endl;
 

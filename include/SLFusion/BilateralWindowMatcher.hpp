@@ -414,6 +414,8 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_06);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_gradient);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_mb_tsukuba);
+
 };
 
 class Test_BilateralWindowMatcher : public ::testing::Test
