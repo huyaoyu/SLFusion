@@ -64,7 +64,7 @@ void BilateralWindowMatcher::update_ws(void)
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
 : OCV_F_TYPE(CV_32FC1),
   mIM(w, nw),
-  mGammaS(1), mGammaC(5), mTAD_T(10000),
+  mGammaS(19), mGammaC(23), mTAD_T(125),
   mACArrayRef(NULL), mACArrayTst(NULL), mWCArrayRef(NULL), mWCArrayTst(NULL), 
   mPixelIdxRef(NULL), mPixelIdxTst(NULL), mABSize(0),
   mABMemorySize(0),
@@ -413,6 +413,26 @@ static int num_inner_pixels(int cols, int minDisp, int halfCount)
     return cols - minDisp - halfCount * 2;
 }
 
+int BilateralWindowMatcher::debug_get_next_index_avg_color(void)
+{
+    return mDebug_ACIdx.at( mDebug_ACIdx.size() - 1 );
+}
+
+int BilateralWindowMatcher::debug_get_size_index_avg_color(void)
+{
+    return mDebug_ACIdx.size();
+}
+
+void BilateralWindowMatcher::debug_pop_index_avg_color(void)
+{
+    mDebug_ACIdx.pop_back();
+}
+
+void BilateralWindowMatcher::debug_push_index_avg_color(int idx)
+{
+    mDebug_ACIdx.push_back( idx );
+}
+
 template <typename _T, typename _D> 
 static void write_mat_matlab_format(const std::string& path, const std::string& name, const Mat& m, int iFlag = 0, int w = 3)
 {
@@ -540,11 +560,14 @@ void BilateralWindowMatcher::debug_in_loop_cost(int i,
         const FMatrix_t& WCRef, const FMatrix_t& WCTst,
         const FMatrix_t& tad)
 {
+    // Prepare the base path string and create the directory.
     std::stringstream ssPath;
     ssPath << mDebug_OutDir << "/lc_" 
            << std::setfill('0') << std::setw(4) << i << "/" 
            << std::setfill('0') << std::setw(4) << disp;
     test_create_directory( ssPath.str() );
+
+    // Save the index, cost, and disparity values to a yaml file.
     std::string fnTemp;
     fnTemp = ssPath.str() + "/mACArray_cost.yml";
     FileStorage fs;
@@ -556,22 +579,26 @@ void BilateralWindowMatcher::debug_in_loop_cost(int i,
         << "ref" << ACRef
         << "tst" << ACTst;
 
+    // Save ACRef and ACTst into both MATLAB and JPEG formats.
     write_mat_matlab_format<R_t, R_t>( ssPath.str(), "ACRef", ACRef );
     write_mat_matlab_format<R_t, R_t>( ssPath.str(), "ACTst", ACTst );
     write_floating_point_mat_as_byte( ssPath.str() + "/ACRef", ACRef );
     write_floating_point_mat_as_byte( ssPath.str() + "/ACTst", ACTst );
 
+    // Save tad.
     fnTemp = ssPath.str() + "/tad.dat";
     std::ofstream ofs;
     ofs.open( fnTemp );
     ofs << tad;
     ofs.close();
 
+    // Save WCRef.
     fnTemp = ssPath.str() + "/WCRef.dat";
     ofs.open( fnTemp );
     ofs << WCRef << std::endl;
     ofs.close();
 
+    // Save WCTst.
     fnTemp = ssPath.str() + "/WCTst.dat";
     ofs.open( fnTemp );
     ofs << WCTst << std::endl;
@@ -728,14 +755,18 @@ void BilateralWindowMatcher::match_single_line(
         idxTst++;
     
         // Debug.
-        if ( true == mFlagDebug )
+        if ( true == mFlagDebug && debug_get_size_index_avg_color() > 0 )
         {
-            if ( i == mDebug_ABIdx0 )
+            if ( i == debug_get_next_index_avg_color() )
             {
+                std::cout << "Debug AC, i = " << i << std::endl;
+
                 debug_in_loop_wc_avg_color( i,
                     mACArrayRef[i], mACArrayTst[i],
                     windowRef, windowTst, winMaskRef, winMaskTst,
                     mWCArrayRef[i], mWCArrayTst[i] );
+
+                debug_pop_index_avg_color();
             }
         }
     }

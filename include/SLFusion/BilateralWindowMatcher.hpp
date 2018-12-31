@@ -328,6 +328,7 @@ public:
     void disable_debug(void);
     void debug_set_array_buffer_idx(size_t idx0, size_t idx1 = 0);
     void debug_set_out_dir(const std::string& dir);
+    void debug_push_index_avg_color(int idx);
 
 private:
     void update_ws(void);
@@ -346,6 +347,10 @@ private:
     void create_array_buffer(size_t size, int matType, bool force = false);
     void destroy_array_buffer(void);
     void allocate_array_buffer(size_t size, int matType);
+
+    int debug_get_next_index_avg_color(void);
+    int debug_get_size_index_avg_color(void);
+    void debug_pop_index_avg_color(void);
 
     void debug_in_loop_wc_avg_color( int i,
         const Mat& ACArrayRef, const Mat& ACArrayTst,
@@ -390,6 +395,8 @@ private:
     size_t mDebug_ABIdx0;
     size_t mDebug_ABIdx1;
     std::string mDebug_OutDir;
+
+    std::vector<int> mDebug_ACIdx;
 
 public:
     friend class Test_BilateralWindowMatcher;

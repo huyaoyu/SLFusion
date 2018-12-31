@@ -6,6 +6,9 @@ clc;
 % WORK_DIR = '../../data/SLFusion/match_single_line_05_cost';
 WORK_DIR = '../../data/SLFusion/match_single_line_mb_tsukuba';
 
+TRUE_DISP_FN = 'TrueDisp.pgm';
+ROW_IDX      = 145;
+
 % List all the file with extension .dat.
 
 files = dir( [WORK_DIR, '/*.dat'] );
@@ -41,4 +44,10 @@ plot( costs(:, 1), '-*' );
 xlabel('x location');
 ylabel('disparity of minimum cost');
 title('Disparity of minimum cost along single line');
+
+% Load the true disparity.
+td = imread([WORK_DIR, '/', TRUE_DISP_FN]);
+hold on
+plot( td(ROW_IDX, :) / 8, 'o-r' );
+hold off
 

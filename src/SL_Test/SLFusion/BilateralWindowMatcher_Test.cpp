@@ -1179,7 +1179,7 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_mb_tsukuba )
 
     // Define the disparity range.
     const int minDisparity = 1;
-    const int maxDisparity = 100;
+    const int maxDisparity = 32;
     const int numDisparity = maxDisparity - minDisparity + 1;
     int pixels = 0;
 
@@ -1187,8 +1187,8 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_mb_tsukuba )
 
     try
     {
-        img0 = imread( "../data/SLFusion/match_single_line_mb_tsukuba/left.jpg",  IMREAD_COLOR );
-        img1 = imread( "../data/SLFusion/match_single_line_mb_tsukuba/right.jpg", IMREAD_COLOR );
+        img0 = imread( "../data/SLFusion/match_single_line_mb_tsukuba/left.ppm",  IMREAD_COLOR );
+        img1 = imread( "../data/SLFusion/match_single_line_mb_tsukuba/right.ppm", IMREAD_COLOR );
 
         cout << "img0.rows = " << img0.rows << ", "
              << "img0.cols = " << img0.cols 
@@ -1233,7 +1233,9 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_mb_tsukuba )
         
         bwm.enable_debug();
         bwm.debug_set_out_dir("../data/SLFusion/match_single_line_mb_tsukuba");
-        bwm.debug_set_array_buffer_idx(176, 0);
+        bwm.debug_set_array_buffer_idx(134, 0);
+        bwm.debug_push_index_avg_color(134);
+        bwm.debug_push_index_avg_color(103);
 
         bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
             padded[0].rows / 2, minDisparity, maxDisparity, mcArray);
