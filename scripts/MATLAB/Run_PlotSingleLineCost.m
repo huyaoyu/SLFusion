@@ -40,6 +40,7 @@ for I = 1:1:nFiles
 end % I
 
 % Plot the minimun cost line.
+h = figure('Name', 'Disparity', 'Numbered');
 plot( costs(:, 1), '-*' );
 xlabel('x location');
 ylabel('disparity of minimum cost');
@@ -51,3 +52,12 @@ hold on
 plot( td(ROW_IDX, :) / 8, 'o-r' );
 hold off
 
+legendString = {
+    'BWM';
+    'True'
+};
+
+legend(legendString);
+
+% Save the figure as an image.
+print()

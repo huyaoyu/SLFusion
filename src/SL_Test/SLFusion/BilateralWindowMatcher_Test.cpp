@@ -1195,8 +1195,8 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_mb_tsukuba )
              << endl;
         
         // Convert to CIELab color space.
-        // cvtColor( img0, img0, COLOR_BGR2Lab );
-        // cvtColor( img1, img1, COLOR_BGR2Lab );
+        cvtColor( img0, img0, COLOR_BGR2Lab );
+        cvtColor( img1, img1, COLOR_BGR2Lab );
 
         // Padding.
         Mat padded[2], paddedMask[2];
