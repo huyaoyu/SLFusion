@@ -20,9 +20,11 @@ nc = size(cCell, 1);
 
 if ( 3 == nc )
     C = zeros(row, col, 3);
-    C(:, :, 1) = cCell{idx(1), 1} / 255;
-    C(:, :, 2) = cCell{idx(2), 1} / 255;
-    C(:, :, 3) = cCell{idx(3), 1} / 255;
+    C(:, :, 1) = cCell{idx(1), 1};
+    C(:, :, 2) = cCell{idx(2), 1};
+    C(:, :, 3) = cCell{idx(3), 1};
+    
+    C = double( C ) / 255;
     
     fig = figure('Name', winTitle, 'NumberTitle', 'off');
     surf(x, y, z, C, 'FaceColor', 'flat');

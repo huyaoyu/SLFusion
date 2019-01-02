@@ -9,6 +9,10 @@ WORK_DIR = '../../data/SLFusion/match_single_line_mb_tsukuba';
 TRUE_DISP_FN = 'TrueDisp.pgm';
 ROW_IDX      = 145;
 
+FONT_SIZE_LABEL = 8;
+FONT_SIZE_TITLE = 8;
+FONT_SIZE_TICK  = 8;
+
 % List all the file with extension .dat.
 
 files = dir( [WORK_DIR, '/*.dat'] );
@@ -40,11 +44,14 @@ for I = 1:1:nFiles
 end % I
 
 % Plot the minimun cost line.
-h = figure('Name', 'Disparity', 'Numbered');
+h = figure('Name', 'Disparity', 'NumberTitle', 'off');
 plot( costs(:, 1), '-*' );
-xlabel('x location');
-ylabel('disparity of minimum cost');
-title('Disparity of minimum cost along single line');
+xlabel('x location', 'FontSize', FONT_SIZE_LABEL);
+ylabel('disparity of minimum cost', 'FontSize', FONT_SIZE_LABEL);
+title('Disparity of minimum cost along single line', 'FontSize', FONT_SIZE_TITLE);
+set(gca, 'FontSize', FONT_SIZE_TICK);
+
+ylim([0, 45]);
 
 % Load the true disparity.
 td = imread([WORK_DIR, '/', TRUE_DISP_FN]);
@@ -60,4 +67,7 @@ legendString = {
 legend(legendString);
 
 % Save the figure as an image.
-print()
+h.PaperUnits = 'centimeters';
+h.PaperPosition = [0 0 8 6];
+print('DispairtyAlongOneLine', '-dtiff', '-r300');
+print('DispairtyAlongOneLine', '-dpng', '-r300');

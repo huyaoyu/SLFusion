@@ -1198,6 +1198,8 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_mb_tsukuba )
         cvtColor( img0, img0, COLOR_BGR2Lab );
         cvtColor( img1, img1, COLOR_BGR2Lab );
 
+        cout << "img0.type() = " << img0.type() << endl;
+
         // Padding.
         Mat padded[2], paddedMask[2];
         Scalar s = Scalar(0, 0, 0);
