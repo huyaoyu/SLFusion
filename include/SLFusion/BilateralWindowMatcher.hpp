@@ -348,6 +348,21 @@ private:
     void destroy_array_buffer(void);
     void allocate_array_buffer(size_t size, int matType);
 
+    /**
+     * The user must make sure thant src and dst have compatible dimensions.
+     * _T is the type of the elements of src and dst.
+     */
+    template <typename _T> 
+    void expand_block_2_window_mat(const Mat& src, Mat& dst);
+
+    /**
+     * The user must make sure thant src and dst have compatible dimensions.
+     * _PT: primitive type.
+     * _MT: matrix type.
+     */
+    template <typename _PT, typename _MT> 
+    void expand_block_2_window_matrix(const _MT& src, _MT& dst);
+
     int debug_get_next_index_avg_color(void);
     int debug_get_size_index_avg_color(void);
     void debug_pop_index_avg_color(void);

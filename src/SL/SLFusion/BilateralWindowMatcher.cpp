@@ -320,6 +320,48 @@ void BilateralWindowMatcher::allocate_array_buffer(size_t size, int matType)
     mABMemorySize = ( sizeOfMatEle + sizeof(R_t) + sizeof(int) ) * mNumKernels * mNumKernels * size * 2;
 }
 
+template <typename _T> 
+void BilateralWindowMatcher::expand_block_2_window_mat(const Mat& src, Mat& dst)
+{
+    const int channels = src.channels();
+
+    const _T* pS = NULL;
+    _T*       pD = NULL;
+    int posCol   = 0;
+    int* pKIR    = mIM.mKnlIdxRow.data(); // Pointer to kernel index row.
+    int* pKIC    = mIM.mKnlIdxCol.data(); // Pointer to kernel index column.
+    int iKIR     = 0;
+    int iKIC     = 0;
+    int posKI    = 0;
+
+    for ( int i = 0; i < dst.rows; ++i )
+    {
+        pD = dst.ptr<_T>(i);
+
+        posCol = 0;
+        for ( int j = 0; j < dst.cols; ++j )
+        {
+            iKIR = *( pKIR + posKI );
+            iKIC = *( pKIC + posKI );
+            pS   = src.ptr<_T>(iKIR);
+
+            for ( int k = 0; k < channels; ++k )
+            {
+                *( pD + posCol + k) = pS[iKIC * channels + k];
+            }
+
+            posKI  += 1;
+            posCol += channels;
+        }
+    }
+}
+
+template <typename _PT, typename _MT> 
+void BilateralWindowMatcher::expand_block_2_window_matrix(const _MT& src, _MT& dst)
+{
+    const _PT* pS = src.data();
+}
+
 size_t BilateralWindowMatcher::get_internal_buffer_szie(void) const
 {
     return mABMemorySize;
@@ -746,6 +788,8 @@ void BilateralWindowMatcher::match_single_line(
         // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside mWCO.wc().
         mWCO.wc( windowRef, winMaskRef, mWCArrayRef[i], mACArrayRef[i] );
         mWCO.wc( windowTst, winMaskTst, mWCArrayTst[i], mACArrayTst[i] );
+
+        // Expand the average color values and the color weights.
 
         mPixelIdxRef[i] = idxRef;
         mPixelIdxTst[i] = idxTst;
