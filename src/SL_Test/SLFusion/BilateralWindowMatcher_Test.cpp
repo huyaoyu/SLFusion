@@ -922,6 +922,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_04)
     delete [] mcArray; mcArray = NULL;
 }
 
+#endif
+
 TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
 {
     using namespace std;
@@ -1034,8 +1036,6 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
 
     delete [] mcArray; mcArray = NULL;
 }
-
-#endif
 
 template <typename _T> 
 static void create_checkboard(int height, int width, int low, int high, int type, OutputArray _dst)

@@ -374,6 +374,7 @@ private:
 
     void debug_in_loop_cost(int i, 
         Real_t cost, int disp, int idxAvgColorTst, 
+        const Mat& winRef, const Mat& winTst, 
         const Mat& ACRef, const Mat& ACTst,
         const FMatrix_t& WCRef, const FMatrix_t& WCTst,
         const FMatrix_t& tad);
@@ -434,13 +435,58 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_02);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_03);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_04);
-    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05);
 #endif
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_06);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_gradient);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_mb_tsukuba);
 
 };
+
+template<typename _TR, typename _TT> 
+void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad)
+{
+    // The rows and cols of ref and tst are assumed to be the same.
+    const int channels = ref.channels();
+    const _TR* pRef    = NULL;
+    const _TT* pTst    = NULL;
+
+    Real_t temp = 0.0;
+
+    int posCol = 0, posColShift = 0;
+    int posTad = 0;
+    // Clear tad.
+    tad.setConstant(0.0);
+
+    for ( int i = 0; i < ref.rows; ++i )
+    {
+        // Get the pointer to the ref and tst.
+        pRef = ref.ptr<_TR>(i);
+        pTst = tst.ptr<_TT>(i);
+
+        posCol = 0;
+
+        for ( int j = 0; j < ref.cols; ++j )
+        {
+            temp        = 0.0;
+            posColShift = posCol;
+
+            for ( int k = 0; k < channels; ++k)
+            {
+                temp += 
+                ( pRef[posColShift] - pTst[posColShift] ) * 
+                ( pRef[posColShift] - pTst[posColShift] );
+
+                posColShift++;
+            }
+
+            *(tad.data() + posTad) = std::min( std::sqrt(temp), mTAD_T );
+
+            posTad++;
+            posCol += channels;
+        }
+    }
+}
 
 template <typename _T> 
 void BilateralWindowMatcher::expand_block_2_window_mat(const Mat& src, Mat& dst)

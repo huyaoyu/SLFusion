@@ -3,9 +3,10 @@ close all;
 clc;
 
 % WORK_DIR = '../../data/SLFusion/match_single_line_gradient_cost';
-% WORK_DIR = '../../data/SLFusion/match_single_line_05_cost';
-WORK_DIR = '../../data/SLFusion/match_single_line_mb_tsukuba';
+WORK_DIR = '../../data/SLFusion/match_single_line_05_cost';
+% WORK_DIR = '../../data/SLFusion/match_single_line_mb_tsukuba';
 
+FLAG_HAVE_TRUE_DISP = 0;
 TRUE_DISP_FN = 'TrueDisp.pgm';
 ROW_IDX      = 145;
 
@@ -51,23 +52,26 @@ ylabel('disparity of minimum cost', 'FontSize', FONT_SIZE_LABEL);
 title('Disparity of minimum cost along single line', 'FontSize', FONT_SIZE_TITLE);
 set(gca, 'FontSize', FONT_SIZE_TICK);
 
-ylim([0, 45]);
+if ( 1 == FLAG_HAVE_TRUE_DISP )
+    ylim([0, 45]);
+    
+    % Load the true disparity.
+    td = imread([WORK_DIR, '/', TRUE_DISP_FN]);
+    hold on
+    plot( td(ROW_IDX, :) / 8, 'o-r' );
+    hold off
 
-% Load the true disparity.
-td = imread([WORK_DIR, '/', TRUE_DISP_FN]);
-hold on
-plot( td(ROW_IDX, :) / 8, 'o-r' );
-hold off
+    legendString = {
+        'BWM';
+        'True'
+    };
 
-legendString = {
-    'BWM';
-    'True'
-};
-
-legend(legendString);
+    legend(legendString);
+end
 
 % Save the figure as an image.
 h.PaperUnits = 'centimeters';
 h.PaperPosition = [0 0 8 6];
 print('DispairtyAlongOneLine', '-dtiff', '-r300');
 print('DispairtyAlongOneLine', '-dpng', '-r300');
+saveas( h, 'DispairtyAlongOneLine', 'fig' );

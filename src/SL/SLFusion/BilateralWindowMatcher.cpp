@@ -190,51 +190,6 @@ Real_t BilateralWindowMatcher::TAD( const tR* pr, const tT* pt, int channels )
         );
 }
 
-template<typename _TR, typename _TT> 
-void BilateralWindowMatcher::TADm(const Mat& ref, const Mat& tst, FMatrix_t& tad)
-{
-    // The rows and cols of ref and tst are assumed to be the same.
-    const int channels = ref.channels();
-    const _TR* pRef    = NULL;
-    const _TT* pTst    = NULL;
-
-    R_t temp = 0.0;
-
-    int posCol = 0, posColShift = 0;
-    int posTad = 0;
-    // Clear tad.
-    tad.setConstant(0.0);
-
-    for ( int i = 0; i < ref.rows; ++i )
-    {
-        // Get the pointer to the ref and tst.
-        pRef = ref.ptr<_TR>(i);
-        pTst = tst.ptr<_TT>(i);
-
-        posCol = 0;
-
-        for ( int j = 0; j < ref.cols; ++j )
-        {
-            temp        = 0.0;
-            posColShift = posCol;
-
-            for ( int k = 0; k < channels; ++k)
-            {
-                temp += 
-                ( pRef[posColShift] - pTst[posColShift] ) * 
-                ( pRef[posColShift] - pTst[posColShift] );
-
-                posColShift++;
-            }
-
-            *(tad.data() + posTad) = std::min( std::sqrt(temp), mTAD_T );
-
-            posTad++;
-            posCol += channels;
-        }
-    }
-}
-
 void BilateralWindowMatcher::destroy_array_buffer(void)
 {
     delete [] mPixelIdxTst; mPixelIdxTst = NULL;
@@ -560,6 +515,7 @@ void BilateralWindowMatcher::debug_in_loop_wc_avg_color( int i,
 
 void BilateralWindowMatcher::debug_in_loop_cost(int i, 
         Real_t cost, int disp, int idxAvgColorTst, 
+        const Mat& winRef, const Mat& winTst,
         const Mat& ACRef, const Mat& ACTst,
         const FMatrix_t& WCRef, const FMatrix_t& WCTst,
         const FMatrix_t& tad)
@@ -582,6 +538,12 @@ void BilateralWindowMatcher::debug_in_loop_cost(int i,
         << "idxAvgColorArrayTst" << idxAvgColorTst
         << "ref" << ACRef
         << "tst" << ACTst;
+
+    // Save winRef and winTst into both MATLAB and JPEG formats.
+    write_mat_matlab_format<uchar, uint>( ssPath.str(), "winRef", winRef, 1 );
+    write_mat_matlab_format<uchar, uint>( ssPath.str(), "winTst", winTst, 1 );
+    write_floating_point_mat_as_byte( ssPath.str() + "/winRef", winRef );
+    write_floating_point_mat_as_byte( ssPath.str() + "/winTst", winTst );
 
     // Save ACRef and ACTst into both MATLAB and JPEG formats.
     write_mat_matlab_format<R_t, R_t>( ssPath.str(), "ACRef", ACRef );
@@ -724,7 +686,7 @@ void BilateralWindowMatcher::match_single_line(
     // =====================================================
 
     int idxRef = minDisp + halfCount, idxTst = halfCount;
-    Range rowRange( rowIdx - halfCount, rowIdx + halfCount + 1 );
+    const Range rowRange( rowIdx - halfCount, rowIdx + halfCount + 1 );
     Range colRangeRef( idxRef - halfCount, idxRef + halfCount + 1 );
     Range colRangeTst( idxTst - halfCount, idxTst + halfCount + 1 );
 
@@ -787,12 +749,21 @@ void BilateralWindowMatcher::match_single_line(
     FM_t tempDenominatorMatrix;
     R_t  tempCost = 0.0;
 
+    // Reset the indices.
+    idxRef = minDisp + halfCount, idxTst = halfCount;
+
     // === Calculate the cost. ===
     int debugCount = 0;
     for ( int i = 0; i < pixels; ++i )
     {
-        // The index in the original image.
+        // The index in the original reference image.
         idxRef = mPixelIdxRef[i];
+        // Column index in the original reference image.
+        colRangeRef.start = idxRef - halfCount;
+        colRangeRef.end   = idxRef + halfCount + 1;
+        // Take out the window from the reference image.
+        windowRef = refMat( rowRange, colRangeRef );
+
         // Save the current reference index.
         pMC[i].set_idx_ref( idxRef );
         pMC[i].reset();
@@ -811,6 +782,14 @@ void BilateralWindowMatcher::match_single_line(
                 break;
             }
 
+            // The index in the original test image.
+            idxTst = mPixelIdxTst[idxAvgColorArrayTst];
+            // Column index in the original test image.
+            colRangeTst.start = idxTst - halfCount;
+            colRangeTst.end   = idxTst + halfCount + 1;
+            // Take out the window from the test image.
+            windowTst = tstMat( rowRange, colRangeTst );
+
             if ( true == mFlagDebug )
             {
                 if ( i == mDebug_ABIdx0 && j == mDebug_ABIdx1 )
@@ -820,7 +799,8 @@ void BilateralWindowMatcher::match_single_line(
             }
 
             // Calculate the TAD over all the kernel blocks of windowRef and windowTst.
-            TADm<R_t, R_t>( mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst], tad );
+            // TADm<R_t, R_t>( mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst], tad );
+            TADm<uchar, uchar>( windowRef, windowTst, tad );
 
             // Calculate the cost value.
             tempDenominatorMatrix = ( mWss.array() * mWCArrayRef[i].array() * mWCArrayTst[idxAvgColorArrayTst].array() ).matrix();
@@ -837,6 +817,7 @@ void BilateralWindowMatcher::match_single_line(
                 {
                     debug_in_loop_cost(i, 
                         tempCost, idxRef - mPixelIdxTst[idxAvgColorArrayTst], idxAvgColorArrayTst,
+                        windowRef, windowTst, 
                         mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst],
                         mWCArrayRef[i], mWCArrayTst[idxAvgColorArrayTst],
                         tad);

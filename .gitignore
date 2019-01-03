@@ -8,4 +8,5 @@ data/
 *.pyc
 *.tif
 *.m~
+*.fig
 
