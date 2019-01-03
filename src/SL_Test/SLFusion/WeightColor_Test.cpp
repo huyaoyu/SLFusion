@@ -41,12 +41,19 @@ TEST_F( Test_WeightColor, average_color_values )
     // Read the image file.
     // cout << "Before read image." << endl;
     Mat matTestAvgColorValues = 
-        imread("/home/yaoyu/SourceCodes/SLFusion/data/SLFusion/DummyImage_TestAverageColorValues.bmp", IMREAD_COLOR);
+        imread("../data/SLFusion/DummyImage_TestAverageColorValues.bmp", IMREAD_COLOR);
+    
+    if ( matTestAvgColorValues.empty() )
+    {
+        ASSERT_FALSE(true) << "Read ../data/SLFusion/DummyImage_TestAverageColorValues.bmp failed.";
+    }
+
+    // cout << matTestAvgColorValues << endl;
     // cout << "Image read." << endl;
 
     // Mask.
     Mat mask( matTestAvgColorValues.size(), CV_8UC1 );
-    mask.setTo( Scalar::all( 1 ) );
+    mask.setTo( Scalar::all( 255 ) );
 
     Mat vcMat;
 
@@ -75,7 +82,13 @@ TEST_F( Test_WeightColor, average_color_values_mask )
     // Read the image file.
     // cout << "Before read image." << endl;
     Mat matTestAvgColorValues = 
-        imread("/home/yaoyu/SourceCodes/SLFusion/data/SLFusion/DummyImage_TestAverageColorValues.bmp", IMREAD_COLOR);
+        imread("../data/SLFusion/DummyImage_TestAverageColorValues.bmp", IMREAD_COLOR);
+
+    if ( matTestAvgColorValues.empty() )
+    {
+        ASSERT_FALSE(true) << "Read ../data/SLFusion/DummyImage_TestAverageColorValues.bmp failed.";
+    }
+
     // cout << "Image read." << endl;
 
     // The input image looks like this:
@@ -86,7 +99,7 @@ TEST_F( Test_WeightColor, average_color_values_mask )
 
     // Mask.
     Mat mask( matTestAvgColorValues.size(), CV_8UC1 );
-    mask.setTo( Scalar::all( 1 ) );
+    mask.setTo( Scalar::all( 255 ) );
 
     // Set second block to all masked.
     mask( Rect( 3, 0, 3, 3 ) ) = Mat::zeros(3, 3, CV_8UC1);

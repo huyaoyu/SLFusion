@@ -58,7 +58,8 @@ void BilateralWindowMatcher::update_ws(void)
     }
 
     // Calculate mWss.
-    mWss = (mPntDistKnl.array() / (-mGammaS)).exp().square().matrix();
+    // mWss = (mPntDistKnl.array() / (-mGammaS)).exp().square().matrix();
+    mWss = mWsMap.array().square().matrix();
 }
 
 BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
@@ -101,7 +102,8 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
     mDistanceMap = FMatrix_t(mWindowWidth, mWindowWidth);
     mWsMap       = FMatrix_t(mWindowWidth, mWindowWidth);
     mPntDistKnl  = FMatrix_t(mNumKernels, mNumKernels);
-    mWss         = FMatrix_t(mNumKernels, mNumKernels);
+    // mWss         = FMatrix_t(mNumKernels, mNumKernels);
+    mWss         = FMatrix_t(mWindowWidth, mWindowWidth);
 
     // Put distance map.
     put_distance_map( mDistanceMap, mIM.mIndexMapRow, mIM.mIndexMapCol );
@@ -304,62 +306,22 @@ void BilateralWindowMatcher::allocate_array_buffer(size_t size, int matType)
         }
     }
 
+    const int length = mWindowWidth;
+
     mACArrayRef = new Mat[size];
-    create_mat_array( mACArrayRef, size, mNumKernels, mNumKernels, matType );
+    create_mat_array( mACArrayRef, size, length, length, matType );
     mACArrayTst = new Mat[size];
-    create_mat_array( mACArrayTst, size, mNumKernels, mNumKernels, matType );
+    create_mat_array( mACArrayTst, size, length, length, matType );
 
     mWCArrayRef = new FM_t[size];
-    create_matrix_array( mWCArrayRef, size, mNumKernels, mNumKernels );
+    create_matrix_array( mWCArrayRef, size, length, length );
     mWCArrayTst = new FM_t[size];
-    create_matrix_array( mWCArrayTst, size, mNumKernels, mNumKernels );
+    create_matrix_array( mWCArrayTst, size, length, length );
 
     mPixelIdxRef = new int[size];
     mPixelIdxTst = new int[size];
 
-    mABMemorySize = ( sizeOfMatEle + sizeof(R_t) + sizeof(int) ) * mNumKernels * mNumKernels * size * 2;
-}
-
-template <typename _T> 
-void BilateralWindowMatcher::expand_block_2_window_mat(const Mat& src, Mat& dst)
-{
-    const int channels = src.channels();
-
-    const _T* pS = NULL;
-    _T*       pD = NULL;
-    int posCol   = 0;
-    int* pKIR    = mIM.mKnlIdxRow.data(); // Pointer to kernel index row.
-    int* pKIC    = mIM.mKnlIdxCol.data(); // Pointer to kernel index column.
-    int iKIR     = 0;
-    int iKIC     = 0;
-    int posKI    = 0;
-
-    for ( int i = 0; i < dst.rows; ++i )
-    {
-        pD = dst.ptr<_T>(i);
-
-        posCol = 0;
-        for ( int j = 0; j < dst.cols; ++j )
-        {
-            iKIR = *( pKIR + posKI );
-            iKIC = *( pKIC + posKI );
-            pS   = src.ptr<_T>(iKIR);
-
-            for ( int k = 0; k < channels; ++k )
-            {
-                *( pD + posCol + k) = pS[iKIC * channels + k];
-            }
-
-            posKI  += 1;
-            posCol += channels;
-        }
-    }
-}
-
-template <typename _PT, typename _MT> 
-void BilateralWindowMatcher::expand_block_2_window_matrix(const _MT& src, _MT& dst)
-{
-    const _PT* pS = src.data();
+    mABMemorySize = ( sizeOfMatEle + sizeof(R_t) + sizeof(int) ) * length * length * size * 2;
 }
 
 size_t BilateralWindowMatcher::get_internal_buffer_szie(void) const
@@ -768,6 +730,8 @@ void BilateralWindowMatcher::match_single_line(
 
     Mat windowRef, windowTst;
     Mat winMaskRef, winMaskTst;
+    Mat ac;
+    FM_t wc(mNumKernels, mNumKernels);
 
     for ( int i = 0; i < pixels; ++i )
     {
@@ -786,10 +750,12 @@ void BilateralWindowMatcher::match_single_line(
         // Calculate weight matrix.
 
         // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside mWCO.wc().
-        mWCO.wc( windowRef, winMaskRef, mWCArrayRef[i], mACArrayRef[i] );
-        mWCO.wc( windowTst, winMaskTst, mWCArrayTst[i], mACArrayTst[i] );
-
-        // Expand the average color values and the color weights.
+        mWCO.wc( windowRef, winMaskRef, wc, ac );
+        expand_block_2_window_mat<R_t>( ac, mACArrayRef[i] );
+        expand_block_2_window_matrix<R_t>( wc, mWCArrayRef[i] );
+        mWCO.wc( windowTst, winMaskTst, wc, ac );
+        expand_block_2_window_mat<R_t>( ac, mACArrayTst[i] );
+        expand_block_2_window_matrix<R_t>( wc, mWCArrayTst[i] );
 
         mPixelIdxRef[i] = idxRef;
         mPixelIdxTst[i] = idxTst;
@@ -815,7 +781,8 @@ void BilateralWindowMatcher::match_single_line(
         }
     }
 
-    FM_t tad( mNumKernels, mNumKernels );
+    // FM_t tad( mNumKernels, mNumKernels );
+    FM_t tad( mWindowWidth, mWindowWidth );
     int  idxAvgColorArrayTst = 0; // The index for avgColorArrayTst.
     FM_t tempDenominatorMatrix;
     R_t  tempCost = 0.0;

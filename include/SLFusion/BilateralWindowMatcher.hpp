@@ -423,6 +423,8 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, half_count);
     FRIEND_TEST(Test_BilateralWindowMatcher, inner_pixels);
     FRIEND_TEST(Test_BilateralWindowMatcher, create_array_buffer);
+    FRIEND_TEST(Test_BilateralWindowMatcher, expand_block_2_window_mat);
+    FRIEND_TEST(Test_BilateralWindowMatcher, expand_block_2_window_matrix);
     FRIEND_TEST(Test_BilateralWindowMatcher, TADm_same_ref_tst);
     FRIEND_TEST(Test_BilateralWindowMatcher, TADm_same_ref_tst_random);
     FRIEND_TEST(Test_BilateralWindowMatcher, TADm_manual);
@@ -432,13 +434,88 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_02);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_03);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_04);
-#endif
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05);
+#endif
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_06);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_gradient);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_mb_tsukuba);
 
 };
+
+template <typename _T> 
+void BilateralWindowMatcher::expand_block_2_window_mat(const Mat& src, Mat& dst)
+{
+    if ( dst.rows != src.rows * mKernelSize ||
+         dst.cols != src.cols * mKernelSize )
+    {
+        std::stringstream ssSrc, ssDst;
+        ssSrc << "src.size() = " << src.size();
+        ssDst << "dst.size() = " << dst.size();
+        EXCEPTION_DIMENSION_MISMATCH(src, ssSrc.str(), dst, ssDst.str());
+    }
+
+    const int channels = src.channels();
+
+    const _T* pS = NULL;
+    _T*       pD = NULL;
+    int posCol   = 0;
+    int* pKIR    = mIM.mKnlIdxRow.data(); // Pointer to kernel index row.
+    int* pKIC    = mIM.mKnlIdxCol.data(); // Pointer to kernel index column.
+    int iKIR     = 0;
+    int iKIC     = 0;
+    int posKI    = 0;
+
+    for ( int i = 0; i < dst.rows; ++i )
+    {
+        pD = dst.ptr<_T>(i);
+
+        posCol = 0;
+        for ( int j = 0; j < dst.cols; ++j )
+        {
+            iKIR = *( pKIR + posKI );
+            iKIC = *( pKIC + posKI );
+            pS   = src.ptr<_T>(iKIR);
+
+            for ( int k = 0; k < channels; ++k )
+            {
+                *( pD + posCol + k) = pS[iKIC * channels + k];
+            }
+
+            posKI  += 1;
+            posCol += channels;
+        }
+    }
+}
+
+template <typename _PT, typename _MT> 
+void BilateralWindowMatcher::expand_block_2_window_matrix(const _MT& src, _MT& dst)
+{
+    if ( dst.size() != mIM.mKnlIdxRow.size() )
+    {
+        // This is an error.
+        std::stringstream ssDst, ssMIM;
+        ssDst << "dst.size() = " << dst.size();
+        ssMIM << "mIM.mKnlIdxRow.size() = " << mIM.mKnlIdxRow.size();
+        EXCEPTION_DIMENSION_MISMATCH(dst, ssDst.str(), mIM, ssMIM.str() );
+    }
+
+    const _PT* pS = src.data();
+    _PT*       pD = dst.data();
+    const int  cS = src.cols(); // Colmumn number of src.
+
+    int* pKIR = mIM.mKnlIdxRow.data();
+    int* pKIC = mIM.mKnlIdxCol.data();
+    int  iKIR = 0;
+    int  iKIC = 0;
+
+    for ( int i = 0; i < dst.size(); ++i )
+    {
+        iKIR = *( pKIR + i );
+        iKIC = *( pKIC + i );
+
+        *( pD + i ) = pS[ iKIR * cS + iKIC ];
+    }
+}
 
 class Test_BilateralWindowMatcher : public ::testing::Test
 {
