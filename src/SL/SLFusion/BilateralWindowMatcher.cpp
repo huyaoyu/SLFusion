@@ -125,15 +125,19 @@ void BilateralWindowMatcher::show_index_maps(void)
 
     mIM.show();
 
+    std::cout.precision(2);
     std::cout << "Distance map: " << std::endl;
     std::cout << mDistanceMap << std::endl;
 
+    std::cout.precision(2);
     std::cout << "Point distance of kernel: " << std::endl;
     std::cout << mPntDistKnl << std::endl;
 
+    std::cout.precision(2);
     std::cout << "Ws map: " << std::endl;
     std::cout << mWsMap << std::endl;
 
+    std::cout.precision(2);
     std::cout << "Wss: " << std::endl;
     std::cout << mWss << std::endl;
 }
@@ -504,11 +508,13 @@ void BilateralWindowMatcher::debug_in_loop_wc_avg_color( int i,
     std::ofstream ofs;
 
     ofs.open( fnTemp );
+    ofs.precision(2);
     ofs << WCRef << std::endl;
     ofs.close();
 
     fnTemp = ssPath.str() + "/WCTst.dat";
     ofs.open( fnTemp );
+    ofs.precision(2);
     ofs << WCTst << std::endl;
     ofs.close();
 }
@@ -555,19 +561,29 @@ void BilateralWindowMatcher::debug_in_loop_cost(int i,
     fnTemp = ssPath.str() + "/tad.dat";
     std::ofstream ofs;
     ofs.open( fnTemp );
+    ofs.precision(2);
     ofs << tad;
     ofs.close();
 
     // Save WCRef.
     fnTemp = ssPath.str() + "/WCRef.dat";
     ofs.open( fnTemp );
+    ofs.precision(2);
     ofs << WCRef << std::endl;
     ofs.close();
 
     // Save WCTst.
     fnTemp = ssPath.str() + "/WCTst.dat";
     ofs.open( fnTemp );
+    ofs.precision(2);
     ofs << WCTst << std::endl;
+    ofs.close();
+
+    // Save WCRef * WCTst.
+    fnTemp = ssPath.str() + "/WCRefxWCTst.dat";
+    ofs.open( fnTemp );
+    ofs.precision(2);
+    ofs << WCRef.array() * WCTst.array() << std::endl;
     ofs.close();
 
     std::cout << "tempCost = " << cost << std::endl;

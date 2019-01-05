@@ -3,9 +3,13 @@ close all;
 clc;
 
 % Base directory and filename.
-baseDir = '../../data/SLFusion/match_single_line_mb_tsukuba/lc_0134/0032';
-titleCell = { 'winRef_0134'; 'winTst_0134_d0032'; 'ACRef_0134'; 'ACTst_0134_d0032' };
-printFn   = { 'FigWinRef_0134'; 'FigWinTst_0134_d0032'; 'FigACRef_0134'; 'FigACTst_0134_d0032' };
+% baseDir = '../../data/SLFusion/match_single_line_mb_tsukuba/lc_0134/0600';
+% titleCell = { 'winRef_0134'; 'winTst_0134_d0600'; 'ACRef_0134'; 'ACTst_0134_d0600' };
+% printFn   = { 'FigWinRef_0134'; 'FigWinTst_0134_d0600'; 'FigACRef_0134'; 'FigACTst_0134_d0600' };
+
+baseDir = '../../data/SLFusion/match_single_line_05_cost/lc_2972/0600';
+titleCell = { 'winRef_2972'; 'winTst_2972_d0600'; 'ACRef_2972'; 'ACTst_2972_d0600' };
+printFn   = { 'FigWinRef_2972'; 'FigWinTst_2972_d0600'; 'FigACRef_2972'; 'FigACTst_2972_d0600' };
 
 FLAG_CIELAB = 1;
 
@@ -40,4 +44,5 @@ for I = 1:1:nFigs
     figCell{I, 1}.PaperPosition = [0 0 8 6];
     print( figCell{I, 1}, printFn{I, 1}, '-dpng',  '-r300' );
     print( figCell{I, 1}, printFn{I, 1}, '-dtiff', '-r300' );
+    saveas( figCell{I, 1}, printFn{I, 1}, 'fig' );
 end % I

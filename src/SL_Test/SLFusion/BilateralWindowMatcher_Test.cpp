@@ -965,8 +965,8 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
         imwrite( "../data/SLFusion/match_single_line_05_cost/img1.jpg", img1, jpegParams );
         
         // Convert to CIELab color space.
-        cvtColor( img0, img0, COLOR_BGR2Lab );
-        cvtColor( img1, img1, COLOR_BGR2Lab );
+        // cvtColor( img0, img0, COLOR_BGR2Lab );
+        // cvtColor( img1, img1, COLOR_BGR2Lab );
 
         // Padding.
         Mat padded[2], paddedMask[2];
@@ -1001,15 +1001,18 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
 
         // Calculate matching cost.
         
-        // bwm.enable_debug();
-        // bwm.debug_set_array_buffer_idx(3095, 1);
+        bwm.enable_debug();
+        bwm.debug_set_out_dir("../data/SLFusion/match_single_line_05_cost");
+        bwm.debug_set_array_buffer_idx(2434, 0);
+        bwm.debug_push_index_avg_color(2434);
+        bwm.debug_push_index_avg_color(2434);
 
         bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
             padded[0].rows / 2, minDisparity, maxDisparity, mcArray);
         cout << "Internal buffer size of BilateralWindowMatcher: " 
              << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
 
-        // bwm.disable_debug();
+        bwm.disable_debug();
 
         // Verify the matching cost.
     }
