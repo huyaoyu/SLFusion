@@ -4,6 +4,7 @@
 
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include "SLFusion/BilateralWindowMatcher.hpp"
 #include "SLFusion/SLFusion.hpp"
@@ -967,6 +968,20 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
         // Convert to CIELab color space.
         // cvtColor( img0, img0, COLOR_BGR2Lab );
         // cvtColor( img1, img1, COLOR_BGR2Lab );
+        cvtColor( img0, img0, COLOR_BGR2GRAY );
+        cvtColor( img1, img1, COLOR_BGR2GRAY );
+
+        // Mat lapImg[2];
+        // Laplacian( img0, lapImg[0], CV_32FC1 );
+        // Laplacian( img1, lapImg[1], CV_32FC1 );
+
+        // convertScaleAbs( lapImg[0], lapImg[0] );
+        // convertScaleAbs( lapImg[1], lapImg[1] );
+
+        // lapImg[0].convertTo( img0, CV_8UC1 );
+        // lapImg[1].convertTo( img1, CV_8UC1 );
+
+        cout << "img0.channels() = " << img0.channels() << endl;
 
         // Padding.
         Mat padded[2], paddedMask[2];

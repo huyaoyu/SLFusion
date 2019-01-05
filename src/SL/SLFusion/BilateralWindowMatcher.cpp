@@ -820,9 +820,11 @@ void BilateralWindowMatcher::match_single_line(
 
             // Calculate the cost value.
             tempDenominatorMatrix = ( mWss.array() * mWCArrayRef[i].array() * mWCArrayTst[idxAvgColorArrayTst].array() ).matrix();
+            // tempDenominatorMatrix = mWss;
 
             tempCost = 
                 ( tempDenominatorMatrix.array() * tad.array() ).sum() / tempDenominatorMatrix.sum();
+            // tempCost = tad.array().mean();
 
             // Save the cost value into pMC.
             pMC[i].push_back( idxRef - mPixelIdxTst[idxAvgColorArrayTst], tempCost );
