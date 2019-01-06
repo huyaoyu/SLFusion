@@ -71,6 +71,12 @@ BilateralWindowMatcher::BilateralWindowMatcher(int w, int nw)
   mABMemorySize(0),
   mFlagDebug(false), mDebug_ABIdx0(0), mDebug_ABIdx1(0), mDebug_OutDir("./DebugOutDir")
 {
+    // Check if int is of length 4.
+    if ( 4 != sizeof(int) )
+    {
+        EXCEPTION_BASE("sizeof(int) must be 4.");
+    }
+
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
     {

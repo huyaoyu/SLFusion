@@ -12,66 +12,75 @@ typedef IMatrix_t IM_t;
 typedef FMatrix_t FM_t;
 typedef Real_t    R_t;
 
-template<typename _ST, typename _DT>
+template<typename _ST, typename _DT, typename _VT>
 void BilateralWindowMatcher::block_average_based_on_integral_image(
-    const Mat& sint, const Mat& mint, Mat& dst, int row, int col) const
+    const Mat& sint, const Mat& mint, Mat& dst, Mat& vc, int row, int col) const
 {
     // Calculate the index of the upper-left pixel.
     const int halfCount = half_count(mWindowWidth);
-    int idxR = row - halfCount;
-    int idxC = col - halfCount;
 
     // Declare variables inside the loop.
     const int channels = sint.channels();
-    int blockR   = 0; // Upper-left row index of a block.
-    int blockC   = 0; // Upper-left col index of a block.
-    const int bs = mKernelSize - 1; // block shift.
-    int blockR1  = 0; // blockR1 = blockR + bs.
-    int blockC1  = 0; // blockC1 = blcokC + bs.
-    int bRK0 = 0, bRK1 = 0; // bRK1 = bRK0 + bs.
-    int bCK0 = 0, bCK1 = 0; // bCK1 = bCK0 + bs.
-    _ST  tempSum = (_ST)( 0 );
-    int  tempNum = 0;
-    _DT* pDst    = NULL;
-    int  colDst  = 0;
+    const int bs   = mKernelSize;     // block shift.
+    const int bsch = bs * channels;   // block shift with channels.
+    int blockR0    = row - halfCount; // Upper-left row index of a block.
+    int blockC0S   = (col - halfCount) * channels; // Upper-left col index of a block in sint.
+    int blockC0M   = col - halfCount; // Upper-left col index of a block in mint.
+    int blockR1    = 0;               // blockR1 = blockR0 + bs.
+    int blockC1S   = 0;               // blockC1S = blcokC0S + bsch.
+    int blockC1M   = 0;               // blockC1M = blcokC0M + bs.
+    int bCK0 = 0, bCK1 = 0;           // bCK1 = bCK0 + bs.
+    _ST  tempSum   = (_ST)( 0 );
+    int  tempNum   = 0;
+    _DT* pDst      = NULL;
+    int  colDst    = 0;
+    _VT* pVc       = NULL;
+
+    // Pointers pointing into sint.
+    _ST* pS0 = NULL; // Upper.
+    _ST* pS1 = NULL; // Lower.
 
     // Loop.
     for ( int i = 0; i < mNumKernels; ++i )
     {
         pDst   = dst.ptr<_DT>( i );
-        blockC = 0; // Reset the column index.
-        colDst = 0; // Reset the column index.
+        pVc    = vc.ptr<_VT>( i );
+        colDst = 0; // Reset the column index of dst.
+        // Reset the column index of sint and mint.
+        blockC0S = 0;
+        blockC0M = 0;
+        blockR1  = blockR0 + bs; // Lower row index of sint and mint.
+        
+        // Get the pointers of sint.
+        pS0 = sint.ptr<_ST>( blockR0 );
+        pS1 = sint.ptr<_ST>( blockR1 );
 
+        // Loop over columns.
         for ( int j = 0; j < mNumKernels; ++j )
         {
-            blockR1 = blockR + bs; // Lower row index.
-            blockC1 = blockC + bs; // Right column index.
+            blockC1M = blockC0M + bs; // Right column index of mint ONLY.
 
+            // Number of valid pixels inside a block/kernel.
             tempNum = 
-                  mint.at<int>( blockR1, blockC1 ) 
-                - mint.at<int>( blockR,  blockC1 ) 
-                - mint.at<int>( blockR1, blockC ) 
-                + mint.at<int>( blockR,  blockC );
+                  mint.at<int>( blockR1, blockC1M ) 
+                - mint.at<int>( blockR0, blockC1M ) 
+                - mint.at<int>( blockR1, blockC0M ) 
+                + mint.at<int>( blockR0, blockC0M );
+            
+            pVc[j] = tempNum; // Only one channel.
 
             if ( 0 != tempNum )
             {
-                bRK0 = blockR;    // Upper row index.
-                bRK1 = bRK0 + bs; // Lower row index.
-                bCK0 = blockC;    // Left column index.
-                bCK1 = bCK0 + bs; // Right column index.
+                bCK0 = blockC0S;     // Left column index of sint.
+                bCK1 = bCK0 + bsch; // Right column index of sint.
 
                 for ( int k = 0; k < channels; ++k )
                 {    
                     tempSum = 
-                          sint.at<_ST>( bRK1, bCK1 ) 
-                        - sint.at<_ST>( bRK0, bCK1 ) 
-                        - sint.at<_ST>( bRK1, bCK0 ) 
-                        + sint.at<_ST>( bRK0, bCK0 );
+                          pS1[ bCK1 ] - pS0[ bCK1 ] - pS1[ bCK0 ] + pS0[ bCK0 ];
 
                     pDst[ colDst + k ] = tempSum / tempNum; // Average.
                     
-                    bRK0++;
-                    bRK1++;
                     bCK0++;
                     bCK1++;
                 }
@@ -84,11 +93,12 @@ void BilateralWindowMatcher::block_average_based_on_integral_image(
                 }
             }
 
-            colDst += channels;
-            blockC += mKernelSize;
+            colDst   += channels;
+            blockC0S += bsch;
+            blockC0M += bs;
         }
 
-        blockR += mKernelSize; // Set the upper-left row index.
+        blockR0 += bs; // Grow the upper-left row index.
     }
 }
 
@@ -136,7 +146,7 @@ void BilateralWindowMatcher::match_single_line(
         EXCEPTION_DIMENSION_MISMATCH(refMInt, ssRef.str(), tstMInt, ssTst.str());
     }
 
-    if ( refMat.cols != refMInt.cols )
+    if ( refMat.cols + 1 != refMInt.cols )
     {
         std::stringstream ssRef;
         ssRef << "( " << refMat.cols << ", " << refMat.rows << " )";

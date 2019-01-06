@@ -364,6 +364,7 @@ private:
      * 
      * _ST is the data type of sint.
      * _DT is the data type of dst.
+     * _VT is the data type of vc.
      * 
      * This function uses mint to calculate the quantity of valid pixels
      * inside a block/kernel.
@@ -375,11 +376,13 @@ private:
      * @param sint Input inegral image.
      * @param mint Input integral mask. The OpenCV data type should be CV_32SC1.
      * @param dst Output averaged blocks, its size is numKernels x numKernels.
+     * @param vc Valid count of pixels in each block/kernel. MUST be a single channel Mat object.
      * @param row Center row index.
      * @param col Center column index.
      */
-    template<typename _ST, typename _DT>
-    void block_average_based_on_integral_image(const Mat& sint, const Mat& mint, Mat& dst,
+    template<typename _ST, typename _DT, typename _VT>
+    void block_average_based_on_integral_image(
+        const Mat& sint, const Mat& mint, Mat& dst, Mat& vc, 
         int row, int col) const;
 
     template<typename tR, typename tT> Real_t TAD( const tR* pr, const tT* pt, int channels );
