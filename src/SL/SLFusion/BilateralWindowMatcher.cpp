@@ -348,30 +348,7 @@ void BilateralWindowMatcher::create_array_buffer(size_t size, int matType, bool 
     mABSize = size;
 }
 
-static int half_count(int n)
-{
-    // Works only with odd number.
-    if ( n & 0x01 != 0x01 )
-    {
-        std::stringstream ss;
-        ss << "n must be an odd number. n = " << n;
-
-        EXCEPTION_BAD_ARGUMENT(, ss.str());
-    }
-
-    // Works only with n > 2.
-    if ( n <= 2 )
-    {
-        std::stringstream ss;
-        ss << "n must be greater than 2. n = " << n;
-
-        EXCEPTION_BAD_ARGUMENT(n, ss.str() );
-    }
-
-    return ( n - 1 ) / 2;
-}
-
-static int num_inner_pixels(int cols, int minDisp, int halfCount)
+int BilateralWindowMatcher::num_inner_pixels(int cols, int minDisp, int halfCount)
 {
     return cols - minDisp - halfCount * 2;
 }
@@ -860,11 +837,6 @@ void BilateralWindowMatcher::match_single_line(
 TEST_F( Test_BilateralWindowMatcher, half_count )
 {
     ASSERT_EQ( half_count(39), 19 ) << "The half count of 39 should be 19.";
-}
-
-TEST_F( Test_BilateralWindowMatcher, inner_pixels )
-{
-    ASSERT_EQ( num_inner_pixels( 138, 20, 19 ), 80 ) << "The number of inner pixels.";
 }
 
 #endif

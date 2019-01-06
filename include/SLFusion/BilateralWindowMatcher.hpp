@@ -320,6 +320,31 @@ public:
         MatchingCost<Real_t>* pMC, int* nMC = NULL);
 
     /**
+     * Calculate block/kernel average based on the input
+     * integral images.
+     * 
+     * Type _IT is the data type of the integral images.
+     * 
+     * refMask and tstMask MUST use 1 to indicate an valid
+     * pixel because the inferred refMInt and tstMInt will 
+     * be used as the counts for valid pixels inside individual
+     * blocks/kernels.
+     * 
+     * @param refInt Reference image in its integral form.
+     * @param tstInt Test image in its integral form.
+     * @param refMInt Reference mask in its integral form. OpenCV data type should be CV_32SC1 (int).
+     * @param tstMInt Test mask in its integral form. OpenCV data type should be CV_32SC1 (int).
+     */
+    template <typename _IT> 
+    void match_single_line(
+        const Mat& refMat, const Mat& tstMat, 
+        const Mat& refInt, const Mat& tstInt,
+        const Mat& refMInt, const Mat& tstMInt,
+        int rowIdx,
+        int minDisp, int maxDisp, 
+        MatchingCost<Real_t>* pMC, int* nMC = NULL);
+
+    /**
      * @return Buffer size is returned as number of bytes. 
      */
     size_t get_internal_buffer_szie(void) const;
@@ -332,6 +357,30 @@ public:
 
 private:
     void update_ws(void);
+
+    int num_inner_pixels(int cols, int minDisp, int halfCount);
+
+    /**
+     * 
+     * _ST is the data type of sint.
+     * _DT is the data type of dst.
+     * 
+     * This function uses mint to calculate the quantity of valid pixels
+     * inside a block/kernel.
+     * 
+     * dst MUST have the size of numKernels x numKernels. Its data type
+     * MUST be the same with _DT. Its number of channels MUST be the same
+     * with sint.
+     * 
+     * @param sint Input inegral image.
+     * @param mint Input integral mask. The OpenCV data type should be CV_32SC1.
+     * @param dst Output averaged blocks, its size is numKernels x numKernels.
+     * @param row Center row index.
+     * @param col Center column index.
+     */
+    template<typename _ST, typename _DT>
+    void block_average_based_on_integral_image(const Mat& sint, const Mat& mint, Mat& dst,
+        int row, int col) const;
 
     template<typename tR, typename tT> Real_t TAD( const tR* pr, const tT* pt, int channels );
 

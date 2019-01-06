@@ -1,11 +1,15 @@
 #ifndef __SLFUSION_SLCOMMON_HPP__
 #define __SLFUSION_SLCOMMON_HPP__
 
-#include <opencv2/core.hpp>
 #include <iostream>
+#include <opencv2/core.hpp>
+
+#include "SLFException/SLFException.hpp"
 
 namespace slf
 {
+
+int half_count(int n);
 
 std::string ocv_type_literal(int type);
 void describe_ocv_mat(const cv::Mat& m, const std::string& name);

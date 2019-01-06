@@ -9,6 +9,29 @@
 namespace slf
 {
 
+int half_count(int n)
+{
+    // Works only with odd number.
+    if ( n & 0x01 != 0x01 )
+    {
+        std::stringstream ss;
+        ss << "n must be an odd number. n = " << n;
+
+        EXCEPTION_BAD_ARGUMENT(n, ss.str());
+    }
+
+    // Works only with n > 2.
+    if ( n <= 2 )
+    {
+        std::stringstream ss;
+        ss << "n must be greater than 2. n = " << n;
+
+        EXCEPTION_BAD_ARGUMENT(n, ss.str() );
+    }
+
+    return ( n - 1 ) / 2;
+}
+
 std::string ocv_type_literal(int type)
 {
     int quotient  = type / 8;

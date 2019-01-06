@@ -95,6 +95,13 @@ TEST_F( Test_BilateralWindowMatcher, wss )
     ASSERT_EQ( bwm.mWss(last, 0), bwm.mWss( last, last) ) << " (last, 0) and (last, last) have the same wss.";
 }
 
+TEST_F( Test_BilateralWindowMatcher, inner_pixels )
+{
+    BilateralWindowMatcher bwm( 3, 13 );
+
+    ASSERT_EQ( bwm.num_inner_pixels( 138, 20, 19 ), 80 ) << "The number of inner pixels.";
+}
+
 TEST_F( Test_BilateralWindowMatcher, create_array_buffer )
 {
     // Create an object to work with.
