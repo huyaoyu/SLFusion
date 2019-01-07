@@ -152,10 +152,10 @@ void BilateralWindowMatcher::match_single_line(
         std::stringstream ssRef;
         ssRef << "( " << refMat.cols << ", " << refMat.rows << " )";
 
-        std::stringstream ssMask;
-        ssMask << "( " << refMInt.cols << ", " << refMInt.rows << " )";
+        std::stringstream ssMInt;
+        ssMInt << "( " << refMInt.cols << ", " << refMInt.rows << " )";
 
-        EXCEPTION_DIMENSION_MISMATCH(refMat, ssRef.str(), refMInt, ssMask.str());
+        EXCEPTION_DIMENSION_MISMATCH(refMat, ssRef.str(), refMInt, ssMInt.str());
     }
 
     if ( refMat.cols <= mWindowWidth + minDisp )
