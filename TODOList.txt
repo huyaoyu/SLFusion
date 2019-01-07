@@ -1,2 +1,2 @@
 
-Writing tests for BilateralWindowMatcher::block_average_based_on_integral_image( ).
+DONE. Writing tests for BilateralWindowMatcher::block_average_based_on_integral_image( ).

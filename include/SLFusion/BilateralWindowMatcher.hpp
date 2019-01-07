@@ -380,7 +380,7 @@ private:
      * @param row Center row index.
      * @param col Center column index.
      */
-    template<typename _ST, typename _DT, typename _VT>
+    template<typename _ST, typename _DT, typename _VT> 
     void block_average_based_on_integral_image(
         const Mat& sint, const Mat& mint, Mat& dst, Mat& vc, 
         int row, int col) const;
@@ -476,6 +476,8 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, half_count);
     FRIEND_TEST(Test_BilateralWindowMatcher, inner_pixels);
     FRIEND_TEST(Test_BilateralWindowMatcher, create_array_buffer);
+    FRIEND_TEST(Test_BilateralWindowMatcher, block_average_based_on_integral_image);
+    FRIEND_TEST(Test_BilateralWindowMatcher, block_average_based_on_integral_image_with_mask);
     FRIEND_TEST(Test_BilateralWindowMatcher, expand_block_2_window_mat);
     FRIEND_TEST(Test_BilateralWindowMatcher, expand_block_2_window_matrix);
     FRIEND_TEST(Test_BilateralWindowMatcher, TADm_same_ref_tst);
@@ -656,5 +658,7 @@ protected:
 };
 
 } // namespace slf.
+
+#include "SLFusion/BWM_MatchSingleLine_Int.hpp"
 
 #endif // __SLFUSION_BILATERALWINDOWMATCHER_HPP__

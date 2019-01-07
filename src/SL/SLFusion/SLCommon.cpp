@@ -6,6 +6,8 @@
 
 #include "SLFusion/SLCommon.hpp"
 
+// uchar slf::SLF_MASK = 1;
+
 namespace slf
 {
 

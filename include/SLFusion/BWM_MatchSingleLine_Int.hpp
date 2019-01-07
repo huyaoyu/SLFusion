@@ -1,21 +1,19 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include "SLFusion/BilateralWindowMatcher.hpp"
 #include "SLFusion/SLCommon.hpp"
 
-using namespace cv;
-using namespace Eigen;
-using namespace slf;
-
-typedef IMatrix_t IM_t;
-typedef FMatrix_t FM_t;
-typedef Real_t    R_t;
+namespace slf
+{
 
 template<typename _ST, typename _DT, typename _VT>
 void BilateralWindowMatcher::block_average_based_on_integral_image(
     const Mat& sint, const Mat& mint, Mat& dst, Mat& vc, int row, int col) const
 {
+    using namespace cv;
+
     // Calculate the index of the upper-left pixel.
     const int halfCount = half_count(mWindowWidth);
 
@@ -37,8 +35,8 @@ void BilateralWindowMatcher::block_average_based_on_integral_image(
     _VT* pVc       = NULL;
 
     // Pointers pointing into sint.
-    _ST* pS0 = NULL; // Upper.
-    _ST* pS1 = NULL; // Lower.
+    const _ST* pS0 = NULL; // Upper.
+    const _ST* pS1 = NULL; // Lower.
 
     // Loop.
     for ( int i = 0; i < mNumKernels; ++i )
@@ -79,7 +77,7 @@ void BilateralWindowMatcher::block_average_based_on_integral_image(
                     tempSum = 
                           pS1[ bCK1 ] - pS0[ bCK1 ] - pS1[ bCK0 ] + pS0[ bCK0 ];
 
-                    pDst[ colDst + k ] = tempSum / tempNum; // Average.
+                    pDst[ colDst + k ] = (_DT)( tempSum / tempNum ); // Average.
                     
                     bCK0++;
                     bCK1++;
@@ -111,6 +109,9 @@ void BilateralWindowMatcher::match_single_line(
         int minDisp, int maxDisp, 
         MatchingCost<Real_t>* pMC, int* nMC)
 {
+    using namespace cv;
+    using namespace Eigen;
+
     if ( true == mFlagDebug )
     {
         std::vector<int> jpegParams;
@@ -224,7 +225,7 @@ void BilateralWindowMatcher::match_single_line(
     Mat windowRef, windowTst;
     Mat winMIntRef, winMIntTst;
     Mat ac;
-    FM_t wc(mNumKernels, mNumKernels);
+    FMatrix_t wc(mNumKernels, mNumKernels);
 
     for ( int i = 0; i < pixels; ++i )
     {
@@ -244,11 +245,11 @@ void BilateralWindowMatcher::match_single_line(
 
         // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside mWCO.wc().
         mWCO.wc( windowRef, winMIntRef, wc, ac );
-        expand_block_2_window_mat<R_t>( ac, mACArrayRef[i] );
-        expand_block_2_window_matrix<R_t>( wc, mWCArrayRef[i] );
+        expand_block_2_window_mat<Real_t>( ac, mACArrayRef[i] );
+        expand_block_2_window_matrix<Real_t>( wc, mWCArrayRef[i] );
         mWCO.wc( windowTst, winMIntTst, wc, ac );
-        expand_block_2_window_mat<R_t>( ac, mACArrayTst[i] );
-        expand_block_2_window_matrix<R_t>( wc, mWCArrayTst[i] );
+        expand_block_2_window_mat<Real_t>( ac, mACArrayTst[i] );
+        expand_block_2_window_matrix<Real_t>( wc, mWCArrayTst[i] );
 
         mPixelIdxRef[i] = idxRef;
         mPixelIdxTst[i] = idxTst;
@@ -274,11 +275,11 @@ void BilateralWindowMatcher::match_single_line(
         }
     }
 
-    // FM_t tad( mNumKernels, mNumKernels );
-    FM_t tad( mWindowWidth, mWindowWidth );
+    // FMatrix_t tad( mNumKernels, mNumKernels );
+    FMatrix_t tad( mWindowWidth, mWindowWidth );
     int  idxAvgColorArrayTst = 0; // The index for avgColorArrayTst.
-    FM_t tempDenominatorMatrix;
-    R_t  tempCost = 0.0;
+    FMatrix_t tempDenominatorMatrix;
+    Real_t  tempCost = 0.0;
 
     // Reset the indices.
     idxRef = minDisp + halfCount, idxTst = halfCount;
@@ -330,7 +331,7 @@ void BilateralWindowMatcher::match_single_line(
             }
 
             // Calculate the TAD over all the kernel blocks of windowRef and windowTst.
-            // TADm<R_t, R_t>( mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst], tad );
+            // TADm<Real_t, Real_t>( mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst], tad );
             TADm<uchar, uchar>( windowRef, windowTst, tad );
 
             // Calculate the cost value.
@@ -367,3 +368,5 @@ void BilateralWindowMatcher::match_single_line(
     // Debug.
     std::cout << "Costs calculated." << std::endl;
 }
+
+} // namespace slf.

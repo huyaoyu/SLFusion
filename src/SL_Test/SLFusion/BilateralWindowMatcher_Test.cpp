@@ -7,6 +7,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include "SLFusion/BilateralWindowMatcher.hpp"
+#include "SLFusion/SLCommon.hpp"
 #include "SLFusion/SLFusion.hpp"
 
 using namespace cv;
@@ -183,6 +184,158 @@ TEST_F( Test_BilateralWindowMatcher, create_array_buffer )
     ASSERT_NE( tempWCArrayRef, (void*)(bwm.mWCArrayRef) ) << "After forcing creation of mWCArrayRef with smaller size.";
     ASSERT_NE( tempWCArrayTst, (void*)(bwm.mWCArrayTst) ) << "After forcing creation of mWCArrayTst with smaller size.";
     ASSERT_EQ( bwm.mABSize, size ) << "mABSize remains the same after forcing creation without changing the size.";
+}
+
+TEST_F( Test_BilateralWindowMatcher, block_average_based_on_integral_image )
+{
+    // Read the image file.
+    // cout << "Before read image." << endl;
+    Mat matTestAvgColorValues = 
+        imread("../data/SLFusion/DummyImage_TestAverageColorValues.bmp", IMREAD_COLOR);
+    
+    if ( matTestAvgColorValues.empty() )
+    {
+        ASSERT_FALSE(true) << "Read ../data/SLFusion/DummyImage_TestAverageColorValues.bmp failed.";
+    }
+
+    if ( matTestAvgColorValues.rows != mDefaultWindowWidth || 
+         matTestAvgColorValues.cols != mDefaultWindowWidth )
+    {
+        stringstream ss;
+        ss << "The size of the input file must be the same with mDefaultWindowWidth. "
+           << "The size of the input file is " << matTestAvgColorValues.size() << ", " 
+           << "mDefaultWindowWidth = " << mDefaultWindowWidth;
+        ASSERT_FALSE(true) << ss.str();
+    }
+
+    // cout << matTestAvgColorValues << endl;
+    // cout << "Image read." << endl;
+
+    // Mask.
+    Mat mask( matTestAvgColorValues.size(), CV_8UC1 );
+    mask.setTo( Scalar::all( SLF_MASK ) ); // MUST set to be 1.
+
+    Mat matAveragedColorValues( mDefaultNumKernels, mDefaultNumKernels, CV_32FC3 );
+    Mat matVc( mDefaultNumKernels, mDefaultNumKernels, CV_8UC1 );
+
+    // Create the integral images of the input image and the mask.
+    Mat matTACVInt, maskInt;
+    integral(matTestAvgColorValues, matTACVInt, CV_32FC3);
+    integral(mask, maskInt, CV_32SC1);
+    const int halfCount = half_count(mDefaultWindowWidth);
+
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
+    bwm.block_average_based_on_integral_image<R_t, R_t, uchar>(
+        matTACVInt, maskInt, matAveragedColorValues, matVc,
+        halfCount, halfCount
+    );
+
+    // cout << matAveragedColorValues << endl;
+
+    int lastIdx = mDefaultNumKernels - 1;
+
+    ASSERT_EQ(  4, matAveragedColorValues.at<Vec3f>(0, 0)[0] );
+    ASSERT_EQ( 13, matAveragedColorValues.at<Vec3f>(0, 0)[1] );
+    ASSERT_EQ( 22, matAveragedColorValues.at<Vec3f>(0, 0)[2] );
+
+    ASSERT_EQ(  4, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[0] );
+    ASSERT_EQ( 13, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[1] );
+    ASSERT_EQ( 22, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[2] );
+}
+
+TEST_F( Test_BilateralWindowMatcher, block_average_based_on_integral_image_with_mask )
+{
+    // Read the image file.
+    // cout << "Before read image." << endl;
+    Mat matTestAvgColorValues = 
+        imread("../data/SLFusion/DummyImage_TestAverageColorValues.bmp", IMREAD_COLOR);
+
+    if ( matTestAvgColorValues.empty() )
+    {
+        ASSERT_FALSE(true) << "Read ../data/SLFusion/DummyImage_TestAverageColorValues.bmp failed.";
+    }
+
+    if ( matTestAvgColorValues.rows != mDefaultWindowWidth || 
+         matTestAvgColorValues.cols != mDefaultWindowWidth )
+    {
+        stringstream ss;
+        ss << "The size of the input file must be the same with mDefaultWindowWidth. "
+           << "The size of the input file is " << matTestAvgColorValues.size() << ", " 
+           << "mDefaultWindowWidth = " << mDefaultWindowWidth;
+        ASSERT_FALSE(true) << ss.str();
+    }
+
+    // cout << "Image read." << endl;
+
+    // The input image looks like this:
+    // Channel0   Channel1   Channel2
+    //  0, 1, 2   9, 10, 11  18, 19, 20
+    //  3, 4, 5  12, 13, 14  21, 22, 23
+    //  6, 7, 8  15, 16, 17  24, 25, 26
+
+    // Mask.
+    Mat mask( matTestAvgColorValues.size(), CV_8UC1 );
+    mask.setTo( Scalar::all( SLF_MASK ) );
+
+    // Set second block to all masked.
+    mask( Rect( 3, 0, 3, 3 ) ) = Mat::zeros(3, 3, CV_8UC1);
+
+    // Set third block to partially masked.
+    mask.at<uchar>( 0, 6 ) = 0;
+    mask.at<uchar>( 1, 7 ) = 0;
+    mask.at<uchar>( 2, 8 ) = 0;
+
+    mask.at<uchar>( 3, 9 ) = 0; mask.at<uchar>( 3, 10 ) = 0; mask.at<uchar>( 3, 11 ) = 0;
+    mask.at<uchar>( 4, 9 ) = 0;
+    mask.at<uchar>( 5, 9 ) = 0;
+
+    // cout << "mask.rows = " << mask.rows << ", mask.cols = " << mask.cols << endl;
+    // cout << "mask = " << endl << mask << endl;
+
+    Mat matAveragedColorValues( mDefaultNumKernels, mDefaultNumKernels, CV_32FC3 );
+    Mat matVc( mDefaultNumKernels, mDefaultNumKernels, CV_8UC1 );
+
+    // Pre-mask the input image.
+    Mat maskInv;
+    maskInv = SLF_MASK - mask;
+    // cout << "maskInv = " << endl << maskInv << endl;
+    matTestAvgColorValues.setTo( Scalar::all(0), maskInv );
+
+    // Create the integral images of the input image and the mask.
+    Mat matTACVInt, maskInt;
+    integral(matTestAvgColorValues, matTACVInt, CV_32FC3);
+    integral(mask, maskInt, CV_32SC1);
+    const int halfCount = half_count(mDefaultWindowWidth);
+
+    BilateralWindowMatcher bwm(mDefaultKernelSize, mDefaultNumKernels);
+    bwm.block_average_based_on_integral_image<R_t, R_t, uchar>(
+        matTACVInt, maskInt, matAveragedColorValues, matVc,
+        halfCount, halfCount
+    );
+
+    // cout << matAveragedColorValues << endl;
+
+    int lastIdx = mDefaultNumKernels - 1;
+
+    ASSERT_EQ(  4, matAveragedColorValues.at<Vec3f>(0, 0)[0] );
+    ASSERT_EQ( 13, matAveragedColorValues.at<Vec3f>(0, 0)[1] );
+    ASSERT_EQ( 22, matAveragedColorValues.at<Vec3f>(0, 0)[2] );
+
+    ASSERT_EQ(  0, matAveragedColorValues.at<Vec3f>(0, 1)[0] );
+    ASSERT_EQ(  0, matAveragedColorValues.at<Vec3f>(0, 1)[1] );
+    ASSERT_EQ(  0, matAveragedColorValues.at<Vec3f>(0, 1)[2] );
+
+    ASSERT_EQ(  4, matAveragedColorValues.at<Vec3f>(0, 2)[0] );
+    ASSERT_EQ( 13, matAveragedColorValues.at<Vec3f>(0, 2)[1] );
+    ASSERT_EQ( 22, matAveragedColorValues.at<Vec3f>(0, 2)[2] );
+
+    ASSERT_EQ(  6, matAveragedColorValues.at<Vec3f>(1, 3)[0] );
+    ASSERT_EQ( 15, matAveragedColorValues.at<Vec3f>(1, 3)[1] );
+    ASSERT_EQ( 24, matAveragedColorValues.at<Vec3f>(1, 3)[2] );
+
+    ASSERT_EQ(  4, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[0] );
+    ASSERT_EQ( 13, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[1] );
+    ASSERT_EQ( 22, matAveragedColorValues.at<Vec3f>(lastIdx, lastIdx)[2] );
 }
 
 TEST_F( Test_BilateralWindowMatcher, expand_block_2_window_mat )

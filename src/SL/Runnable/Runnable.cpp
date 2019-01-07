@@ -57,6 +57,7 @@ void Runnable::show_size_of_types(void)
 
 	std::cout << "sizeof(char)      = " << sizeof(char) << std::endl;
 	std::cout << "sizeof(uchar)     = " << sizeof(unsigned char) << std::endl;
+	// std::cout << "(ucahr)(1) - (uchar)(255) = " << (unsigned char)( (unsigned char)(1) - (unsigned char)(255) ) << std::endl;
 	std::cout << "sizeof(int)       = " << sizeof(int) << std::endl;
 	std::cout << "sizeof(uint)      = " << sizeof(uint) << std::endl;
 	std::cout << "sizeof(short)     = " << sizeof(short) << std::endl;

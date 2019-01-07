@@ -9,6 +9,8 @@
 namespace slf
 {
 
+const uchar SLF_MASK = 1;
+
 int half_count(int n);
 
 std::string ocv_type_literal(int type);
