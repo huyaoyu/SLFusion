@@ -136,6 +136,17 @@ void BilateralWindowMatcher::match_single_line(
         EXCEPTION_DIMENSION_MISMATCH(refMat, ssRef.str(), tstMat, ssTst.str());
     }
 
+    if ( refInt.cols != tstInt.cols )
+    {
+        std::stringstream ssRef;
+        ssRef << "( " << refInt.cols << ", " << refInt.rows << " )";
+
+        std::stringstream ssTst;
+        ssTst << "( " << tstInt.cols << ", " << tstInt.rows << " )";
+
+        EXCEPTION_DIMENSION_MISMATCH(refInt, ssRef.str(), tstInt, ssTst.str());
+    }
+
     if ( refMInt.cols != tstMInt.cols )
     {
         std::stringstream ssRef;
@@ -147,7 +158,7 @@ void BilateralWindowMatcher::match_single_line(
         EXCEPTION_DIMENSION_MISMATCH(refMInt, ssRef.str(), tstMInt, ssTst.str());
     }
 
-    if ( refMat.cols + 1 != refMInt.cols )
+    if ( refMat.cols + 1 != refMInt.cols || refMat.cols + 1 != refInt.cols )
     {
         std::stringstream ssRef;
         ssRef << "( " << refMat.cols << ", " << refMat.rows << " )";
@@ -224,8 +235,18 @@ void BilateralWindowMatcher::match_single_line(
 
     Mat windowRef, windowTst;
     Mat winMIntRef, winMIntTst;
-    Mat ac;
+    Mat vc( mNumKernels, mNumKernels, CV_8UC1 );
     FMatrix_t wc(mNumKernels, mNumKernels);
+
+    Mat ac;
+    if ( 3 == refInt.channels() )
+    {
+        ac = Mat(mNumKernels, mNumKernels, CV_32FC3);
+    }
+    else
+    {
+        ac = Mat(mNumKernels, mNumKernels, CV_32FC1);
+    }
 
     for ( int i = 0; i < pixels; ++i )
     {
@@ -244,10 +265,15 @@ void BilateralWindowMatcher::match_single_line(
         // Calculate weight matrix.
 
         // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside mWCO.wc().
-        mWCO.wc( windowRef, winMIntRef, wc, ac );
+        // mWCO.wc( windowRef, winMIntRef, wc, ac );
+        block_average_based_on_integral_image<_IT, Real_t, uchar>( refInt, refMInt, ac, vc, rowIdx, idxRef );
+
         expand_block_2_window_mat<Real_t>( ac, mACArrayRef[i] );
         expand_block_2_window_matrix<Real_t>( wc, mWCArrayRef[i] );
-        mWCO.wc( windowTst, winMIntTst, wc, ac );
+
+        // mWCO.wc( windowTst, winMIntTst, wc, ac );
+        block_average_based_on_integral_image<_IT, Real_t, uchar>( tstInt, tstMInt, ac, vc, rowIdx, idxTst );
+
         expand_block_2_window_mat<Real_t>( ac, mACArrayTst[i] );
         expand_block_2_window_matrix<Real_t>( wc, mWCArrayTst[i] );
 

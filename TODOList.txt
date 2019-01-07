@@ -1,7 +1,9 @@
 
 DONE. Writing tests for BilateralWindowMatcher::block_average_based_on_integral_image( ).
 
-
+* Write test code for wc().
+    Special center.
+    Wc with mask.
 
 * Finish the code of BilateralWindowMatcher::match_single_line( ) based on integral image.
 

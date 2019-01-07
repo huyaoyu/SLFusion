@@ -294,4 +294,37 @@ TEST_F(Test_WeightColor, put_wc_mask)
     ASSERT_EQ( wc(centerIdx - 1, centerIdx - 1), 0.0 );
 }
 
+TEST_F( Test_WeightColor, put_wc_all_the_same_external_avg )
+{
+    // Create an input Mat object with all its pixels equal Scalar::all(255).
+    const int numKernels  = 13;
+    const int windowWidth = 3 * 13;
+
+    Mat ac( numKernels, numKernels, CV_32FC3 );
+    ac.setTo( Scalar::all( 255 ) );
+
+    Mat vc( numKernels, numKernels, CV_8UC1 );
+    vc.setTo( Scalar::all( 9 ) );
+
+    const int centerIdx = ( numKernels - 1 ) / 2;
+
+    // Resulting matrix.
+    FM_t wc = FM_t( numKernels, numKernels );
+
+    // Get the wc values.
+    IndexMapper im( 3, 13 );
+    WeightColor wco( 13, im.mKnlIdxRow, im.mKnlIdxCol, 13.0 );
+
+    wco.wc<R_t>( ac, vc, wc );
+
+    // cout << "wc = " << endl << wc << endl;
+
+    ASSERT_EQ( wc( 0, 0 ), 1 );
+    ASSERT_EQ( wc( centerIdx, centerIdx ), 1 );
+    ASSERT_EQ( wc( numKernels - 1, numKernels - 1 ), 1 );
+
+    ASSERT_EQ( wc.rows(), numKernels ) << "The rows of weight color is numKernels.";
+    ASSERT_EQ( wc.cols(), numKernels ) << "The cols of weight color is numKernels.";
+}
+
 }

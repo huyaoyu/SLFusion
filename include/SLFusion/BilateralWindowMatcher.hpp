@@ -237,6 +237,16 @@ public:
 
     void wc(const Mat& src, const Mat& mask, FMatrix_t& wc, Mat& avgColor);
 
+    /**
+     * _AT is the data type of ac.
+     * 
+     * @param ac Average colover values. Datatype is _AT.
+     * @param vc The valid count.
+     * @param wc The color weights value.
+     */
+    template <typename _AT> 
+    void wc( const Mat& ac, const Mat& vc, FMatrix_t& wc );
+
     WeightColor& operator=( const WeightColor& rhs );
 
 private:
@@ -267,7 +277,7 @@ public:
     FRIEND_TEST(Test_WeightColor, put_wc_all_the_same);
     FRIEND_TEST(Test_WeightColor, put_wc_special_center);
     FRIEND_TEST(Test_WeightColor, put_wc_mask);
-
+    FRIEND_TEST(Test_WeightColor, put_wc_all_the_same_external_avg);
 };
 
 class Test_WeightColor : public ::testing::Test
@@ -660,5 +670,6 @@ protected:
 } // namespace slf.
 
 #include "SLFusion/BWM_MatchSingleLine_Int.hpp"
+#include "SLFusion/WC_TemplateMembers.hpp"
 
 #endif // __SLFUSION_BILATERALWINDOWMATCHER_HPP__
