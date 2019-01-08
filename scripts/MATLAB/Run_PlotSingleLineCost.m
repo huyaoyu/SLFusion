@@ -3,8 +3,10 @@ close all;
 clc;
 
 % WORK_DIR = '../../data/SLFusion/match_single_line_gradient_cost';
-WORK_DIR = '../../data/SLFusion/match_single_line_05_cost';
+% WORK_DIR = '../../data/SLFusion/match_single_line_05_cost';
 % WORK_DIR = '../../data/SLFusion/match_single_line_mb_tsukuba';
+% WORK_DIR = '../../data/SLFusion/match_single_line_gradient_cost_integral_image';
+WORK_DIR = '../../data/SLFusion/match_single_line_05_integral_image';
 
 FLAG_HAVE_TRUE_DISP = 0;
 TRUE_DISP_FN = 'TrueDisp.pgm';

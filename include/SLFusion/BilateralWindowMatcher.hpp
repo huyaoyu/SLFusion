@@ -278,6 +278,8 @@ public:
     FRIEND_TEST(Test_WeightColor, put_wc_special_center);
     FRIEND_TEST(Test_WeightColor, put_wc_mask);
     FRIEND_TEST(Test_WeightColor, put_wc_all_the_same_external_avg);
+    FRIEND_TEST(Test_WeightColor, put_wc_special_cener_external_avg);
+    FRIEND_TEST(Test_WeightColor, put_wc_mask_external_avg);
 };
 
 class Test_WeightColor : public ::testing::Test
@@ -499,12 +501,14 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_02);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_03);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_04);
-#endif
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05);
-    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_06);
+#endif
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_checkerboard);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_gradient);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_mb_tsukuba);
-
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_checkerboard_integral_image);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_gradient_integral_image);
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05_integral_image);
 };
 
 template<typename _TR, typename _TT> 

@@ -79,7 +79,7 @@ public:
      */
     Runnable::RES_t read_LIDAR( const std::string& fn );
 
-    static int put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst, cv::OutputArray _mask);
+    static int put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst, cv::OutputArray _mask, double m = 1);
 
 protected:
     Runnable::RES_t put_sides( const Vec_t& r, Side_t& s0, Side_t& s1 );

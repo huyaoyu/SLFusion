@@ -1,13 +1,13 @@
 
 DONE. Writing tests for BilateralWindowMatcher::block_average_based_on_integral_image( ).
 
-* Write test code for wc().
+DONE. Write test code for wc().
     Special center.
     Wc with mask.
 
 * Finish the code of BilateralWindowMatcher::match_single_line( ) based on integral image.
-
-* Writing tests for BilateralWindowMatcher::match_single_line( ).
+    Investigate the issues with "half black" ACRef.jpg and ACTst.jpg.
+    Test cases for BilateralWindowMatcher::match_single_line( ).
 
 * Modify the code of TAD calculation to use table instead of exp() function.
 

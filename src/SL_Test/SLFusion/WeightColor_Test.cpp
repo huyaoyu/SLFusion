@@ -327,4 +327,123 @@ TEST_F( Test_WeightColor, put_wc_all_the_same_external_avg )
     ASSERT_EQ( wc.cols(), numKernels ) << "The cols of weight color is numKernels.";
 }
 
+TEST_F( Test_WeightColor, put_wc_special_cener_external_avg )
+{
+    // Create an input Mat object with all its pixels equal Scalar::all(255) except the center one.
+    const int numKernels  = 13;
+    const int windowWidth = 3 * 13;
+
+    Mat src( windowWidth, windowWidth, CV_8UC3 );
+    src.setTo( Scalar::all( 255 ) );
+
+    Mat mask( src.size(), CV_8UC1 );
+    mask.setTo( Scalar::all( 1 ) );
+
+    const int centerIdxSrc = ( windowWidth - 1 ) / 2;
+    const int centerIdx    = ( numKernels - 1 ) / 2;
+
+    ASSERT_EQ( centerIdxSrc, 19 );
+
+    src.at<Vec3b>( centerIdxSrc, centerIdxSrc ) = Vec3b( 1, 1, 1 );
+
+    // Resulting matrix.
+    FM_t wc = FM_t( numKernels, numKernels );
+
+    // Get the wc values.
+    IndexMapper im( 3, numKernels );
+    WeightColor wco( numKernels, im.mKnlIdxRow, im.mKnlIdxCol, 13.0 );
+
+    Mat avgColor( numKernels, numKernels, CV_32FC3 );
+    Mat vc;
+    wco.put_average_color_values( src, avgColor, mask, vc );
+
+    wco.wc<R_t>( avgColor, vc, wc );
+
+    // cout << "avgColor = " << endl << avgColor << endl;
+
+    // cout << "wc = " << endl << wc << endl;
+
+    const R_t nonCenterValue = 0.02327958049488006;
+    const R_t eps = 1e-5;
+
+    ASSERT_LT( std::fabs( ( wc(0, 0) - nonCenterValue ) / nonCenterValue ), eps );
+
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc - 0 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 0, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 0, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc - 0 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
+
+    // Calculate the average color first.
+    wco.put_average_color_values( src, avgColor, mask, vc );
+    wco.wc<R_t>( avgColor, vc, wc );
+
+    // cout << "wc = " << endl << wc << endl;
+
+    const R_t nonCenterValue2 = 2.0080584471753715e-15;
+
+    ASSERT_EQ( wc( centerIdx,     centerIdx     ), 1 );
+    ASSERT_LT( std::fabs( ( wc(centerIdx - 1, centerIdx + 1) - nonCenterValue2 ) / nonCenterValue2 ), eps );
+    ASSERT_LT( std::fabs( ( wc(centerIdx + 1, centerIdx - 1) - nonCenterValue2 ) / nonCenterValue2 ), eps );
+}
+
+TEST_F( Test_WeightColor, put_wc_mask_external_avg )
+{
+    // Create an input Mat object with all its pixels equal Scalar::all(255) except the center one.
+    const int numKernels  = 13;
+    const int windowWidth = 3 * 13;
+
+    Mat src( windowWidth, windowWidth, CV_8UC3 );
+    src.setTo( Scalar::all( 255 ) );
+
+    const int centerIdxSrc = ( windowWidth - 1 ) / 2;
+    const int centerIdx    = ( numKernels - 1 ) / 2;
+
+    src.at<Vec3b>( centerIdxSrc, centerIdxSrc ) = Vec3b( 1, 1, 1 );
+
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc - 0 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 1, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 0, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc - 0, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc - 1 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc - 0 ) = Vec3b( 1, 1, 1 );
+    src.at<Vec3b>( centerIdxSrc + 1, centerIdxSrc + 1 ) = Vec3b( 1, 1, 1 );
+
+    Mat mask( src.size(), CV_8UC1 );
+    mask.setTo( Scalar::all( 1 ) );
+
+    mask( Rect( 0, 0, windowWidth, centerIdxSrc ) ).setTo( Scalar::all(0) );
+    mask( Rect( 0, centerIdxSrc, centerIdxSrc, centerIdxSrc + 1 ) ).setTo( Scalar::all(0) );
+
+    // Get the wc values.
+    IndexMapper im( 3, numKernels );
+    WeightColor wco( numKernels, im.mKnlIdxRow, im.mKnlIdxCol, 13.0 );
+
+    // Resulting matrix.
+    FM_t wc = FM_t( numKernels, numKernels );
+    Mat avgColor( numKernels, numKernels, CV_32FC3 );
+    Mat vc;
+
+    wco.put_average_color_values( src, avgColor, mask, vc );
+    wco.wc<R_t>( avgColor, vc, wc );
+
+    // cout << "avgColor = " << endl << avgColor << endl;
+    // cout << "wc = " << endl << wc << endl;
+
+    const R_t centerValue = 1.0;
+    const R_t nonCenterValue = 2.0080584471753715e-15;
+    const R_t eps = 1e-5;
+
+    ASSERT_LT( std::fabs( ( wc(    centerIdx,     centerIdx) - 1.0 ) / 1.0 ), eps ) << "Center index must always be 1.0.";
+    ASSERT_LT( std::fabs( ( wc(    centerIdx, centerIdx + 1) - nonCenterValue ) / nonCenterValue ), eps );
+    ASSERT_LT( std::fabs( ( wc(centerIdx + 1, centerIdx + 1) - nonCenterValue ) / nonCenterValue ), eps );
+    ASSERT_EQ( wc(centerIdx - 1, centerIdx + 1), 0.0 );
+    ASSERT_EQ( wc(centerIdx - 1,     centerIdx), 0.0 );
+    ASSERT_EQ( wc(centerIdx - 1, centerIdx - 1), 0.0 );
+}
+
 }

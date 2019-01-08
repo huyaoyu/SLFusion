@@ -262,17 +262,20 @@ void BilateralWindowMatcher::match_single_line(
         winMIntRef = refMInt( rowRange, colRangeRef );
         winMIntTst = tstMInt( rowRange, colRangeTst );
 
-        // Calculate weight matrix.
+        // ============================
+        // = Calculate weight matrix. =
+        // ============================
 
-        // Memory allocation for avgColorArrayRef and avgColorArrayTst will occur inside mWCO.wc().
         // mWCO.wc( windowRef, winMIntRef, wc, ac );
         block_average_based_on_integral_image<_IT, Real_t, uchar>( refInt, refMInt, ac, vc, rowIdx, idxRef );
+        mWCO.wc<Real_t>( ac, vc, wc );
 
         expand_block_2_window_mat<Real_t>( ac, mACArrayRef[i] );
         expand_block_2_window_matrix<Real_t>( wc, mWCArrayRef[i] );
 
         // mWCO.wc( windowTst, winMIntTst, wc, ac );
         block_average_based_on_integral_image<_IT, Real_t, uchar>( tstInt, tstMInt, ac, vc, rowIdx, idxTst );
+        mWCO.wc<Real_t>( ac, vc, wc );
 
         expand_block_2_window_mat<Real_t>( ac, mACArrayTst[i] );
         expand_block_2_window_matrix<Real_t>( wc, mWCArrayTst[i] );

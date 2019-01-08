@@ -164,7 +164,7 @@ get_r_by_angle(Run_SLFusion::real angle)
  * 
  */
 int
-Run_SLFusion::put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst, cv::OutputArray _mask)
+Run_SLFusion::put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv, cv::OutputArray _dst, cv::OutputArray _mask, double m)
 {
     // Check the validity of w and nw.
     if ( 0x01 & w == 0x00 || w <= 0)
@@ -199,7 +199,7 @@ Run_SLFusion::put_padded_mat(cv::InputArray _src, int w, int nw, cv::Scalar& spv
 
     // Create the mask.
     mask.setTo( cv::Scalar::all(0) );
-    mask( cv::Rect( P, P, mask.cols - 2*P, mask.rows - 2*P ) ).setTo(cv::Scalar::all(255));
+    mask( cv::Rect( P, P, mask.cols - 2*P, mask.rows - 2*P ) ).setTo(cv::Scalar::all(m));
 
     return 0;
 }
