@@ -250,6 +250,14 @@ void BilateralWindowMatcher::match_single_line(
 
     for ( int i = 0; i < pixels; ++i )
     {
+        if ( true == mFlagDebug && debug_get_size_index_avg_color() > 0 )
+        {
+            if ( i == debug_get_next_index_avg_color() )
+            {
+                std::cout << "Debug AC, i = " << i << std::endl;
+            }
+        }
+
         // Update the ROIs in refMat and tstMat.
         colRangeRef.start = idxRef - halfCount;
         colRangeRef.end   = idxRef + halfCount + 1;

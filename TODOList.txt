@@ -9,6 +9,8 @@ DONE. Write test code for wc().
     Investigate the issues with "half black" ACRef.jpg and ACTst.jpg.
     Test cases for BilateralWindowMatcher::match_single_line( ).
 
+* Try to use Sobel filter.
+
 * Modify the code of TAD calculation to use table instead of exp() function.
 
 * Design code to produce disparity map.
