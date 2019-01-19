@@ -1665,7 +1665,7 @@ using namespace std;
         integral( padded[1], tstInt, CV_32FC3 );
         integral( paddedMask[1], tstMInt, CV_32SC1 );
 
-        bwm.match_single_line<R_t>( padded[0], padded[1], refInt, tstInt, refMInt, tstMInt, 
+        bwm.match_single_line<uchar, R_t>( padded[0], padded[1], refInt, tstInt, refMInt, tstMInt, 
             ( windowWidth - 1 )/2 + img0.rows / 2, minDisparity, maxDisparity, mcArray.get() );
 
         // bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
@@ -1771,7 +1771,7 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_gradient_integral_image )
     // Create the matcher.
     BilateralWindowMatcher bwm( kernelSize, numKernels );
 
-    bwm.match_single_line<R_t>( padded[0], padded[1], refInt, tstInt, refMInt, tstMInt, 
+    bwm.match_single_line<uchar, R_t>( padded[0], padded[1], refInt, tstInt, refMInt, tstMInt, 
         ( windowWidth - 1 )/2 + img0.rows / 2, minDisparity, maxDisparity, mcArray.get() );
 
     // bwm.match_single_line( padded[0], padded[1], mask0, paddedMask[1],
@@ -1825,11 +1825,28 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_05_integral_image )
         imwrite( "../data/SLFusion/match_single_line_05_integral_image/img0.jpg", img0, jpegParams );
         imwrite( "../data/SLFusion/match_single_line_05_integral_image/img1.jpg", img1, jpegParams );
         
-        // Convert to CIELab color space.
+        // // Convert to CIELab color space.
         // cvtColor( img0, img0, COLOR_BGR2Lab );
         // cvtColor( img1, img1, COLOR_BGR2Lab );
-        // cvtColor( img0, img0, COLOR_BGR2GRAY );
-        // cvtColor( img1, img1, COLOR_BGR2GRAY );
+        // Convert to grayscale image.
+        Mat gray[2];
+        cvtColor( img0, gray[0], COLOR_BGR2GRAY );
+        cvtColor( img1, gray[1], COLOR_BGR2GRAY );
+        imwrite( "../data/SLFusion/match_single_line_05_integral_image/Gray_img0.jpg", gray[0], jpegParams );
+        imwrite( "../data/SLFusion/match_single_line_05_integral_image/Gray_img1.jpg", gray[1], jpegParams );
+
+        // x-derivative.
+        Scharr( gray[0], img0, CV_32FC1, 1, 0, 1.0, 0.0 );
+        Scharr( gray[1], img1, CV_32FC1, 1, 0, 1.0, 0.0 );
+
+        // img0 = abs(img0);
+        // img1 = abs(img1);
+
+        // Mat tempInt;
+        // integral( img0, tempInt, CV_32FC1 );
+        // cout << "tempInt.at<R_t> = " << tempInt.at<R_t>( img0.rows, img0.cols ) << endl; 
+        write_floating_point_mat_as_byte( "../data/SLFusion/match_single_line_05_integral_image/Scharr_img0.jpg", img0 );
+        write_floating_point_mat_as_byte( "../data/SLFusion/match_single_line_05_integral_image/Scharr_img1.jpg", img1 );
 
         // Mat lapImg[2];
         // Laplacian( img0, lapImg[0], CV_32FC1 );
@@ -1902,7 +1919,7 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_05_integral_image )
         bwm.debug_push_index_avg_color(2434);
         bwm.debug_push_index_avg_color(2434);
 
-        bwm.match_single_line<R_t>( padded[0], padded[1], refInt, tstInt, refMInt, tstMInt, 
+        bwm.match_single_line<R_t, R_t>( padded[0], padded[1], refInt, tstInt, refMInt, tstMInt, 
             padded[0].rows / 2, minDisparity, maxDisparity, mcArray.get() );
 
         // bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
@@ -1926,6 +1943,11 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_05_integral_image )
         {
             mcArray[i].write(mcDir);
         }
+    }
+    catch ( exception_base& exp )
+    {
+        cout << boost::get_error_info<ExceptionInfoString>(exp) << endl;
+        ASSERT_FALSE(true);
     }
     catch ( exception& exp )
     {

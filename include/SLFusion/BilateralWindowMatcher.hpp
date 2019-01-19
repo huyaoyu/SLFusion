@@ -176,9 +176,17 @@ public:
             {
                 return sizeof(float) == sizeof(Real_t) ? CV_32FC3 : CV_64FC3;
             }
+            case CV_32FC1:
+            {
+                return sizeof(float) == sizeof(Real_t) ? CV_32FC1 : CV_64FC1;
+            }
+            case CV_32FC3:
+            {
+                return sizeof(float) == sizeof(Real_t) ? CV_32FC3 : CV_64FC3;
+            }
             default:
             {
-                EXCEPTION_BAD_ARGUMENT( imageType, "Only supports CV_8UC1 and CV_8UC3." );
+                EXCEPTION_BAD_ARGUMENT( imageType, "Only supports CV_8UC1, CV_8UC3, CV_32FC1, and CV_32FC3." );
             }
         }
     }
@@ -347,7 +355,7 @@ public:
      * @param refMInt Reference mask in its integral form. OpenCV data type should be CV_32SC1 (int).
      * @param tstMInt Test mask in its integral form. OpenCV data type should be CV_32SC1 (int).
      */
-    template <typename _IT> 
+    template <typename _ST, typename _IT> 
     void match_single_line(
         const Mat& refMat, const Mat& tstMat, 
         const Mat& refInt, const Mat& tstInt,

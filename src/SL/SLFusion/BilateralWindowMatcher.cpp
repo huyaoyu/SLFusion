@@ -472,10 +472,36 @@ void BilateralWindowMatcher::debug_in_loop_wc_avg_color( int i,
 
     // Save matlab format files.
     // DESCRIBE_OCV_MAT(refMat);
-    write_mat_matlab_format<uchar, int>( ssPath.str(), "windowRef", refMat, 1, 3 );
-    write_mat_matlab_format<uchar, int>( ssPath.str(), "windowTst", tstMat, 1, 3 );
-    write_mat_matlab_format<uchar, int>( ssPath.str(), "maskRef", refMask, 1, 3 );
-    write_mat_matlab_format<uchar, int>( ssPath.str(), "maskTst", tstMask, 1, 3 );
+    if ( CV_8UC1 == refMat.type() || CV_8UC3 == refMat.type() )
+    {
+        write_mat_matlab_format<uchar, int>( ssPath.str(), "windowRef", refMat, 1, 3 );
+        write_mat_matlab_format<uchar, int>( ssPath.str(), "windowTst", tstMat, 1, 3 );
+    }
+    else if ( CV_32FC1 == refMat.type() || CV_32FC3 == refMat.type() )
+    {
+        write_mat_matlab_format<R_t, R_t>( ssPath.str(), "windowRef", refMat, 0, 3 );
+        write_mat_matlab_format<R_t, R_t>( ssPath.str(), "windowTst", tstMat, 0, 3 );
+    }
+    else
+    {
+        EXCEPTION_BASE( "refMat.type() is supposed to be CV_8UC1, CV_8UC3, CV_32FC1, CV_32FC3." );
+    }
+
+    if ( CV_8UC1 == refMask.type() || CV_8UC3 == refMask.type() )
+    {
+        write_mat_matlab_format<uchar, int>( ssPath.str(), "maskRef", refMask, 1, 3 );
+        write_mat_matlab_format<uchar, int>( ssPath.str(), "maskTst", tstMask, 1, 3 );
+    }
+    else if ( CV_32SC1 == refMask.type() || CV_32SC3 == refMask.type() )
+    {
+        write_mat_matlab_format<int, int>( ssPath.str(), "maskRef", refMask, 1, 3 );
+        write_mat_matlab_format<int, int>( ssPath.str(), "maskTst", tstMask, 1, 3 );
+    }
+    else
+    {
+        EXCEPTION_BASE( "refMask.type() is supposed to be CV_8UC1, CV_8UC3, CV_32FC1, CV_32FC3." );
+    }
+    
     write_mat_matlab_format<R_t, R_t>( ssPath.str(), "acRef", ACArrayRef );
     write_mat_matlab_format<R_t, R_t>( ssPath.str(), "acTst", ACArrayTst );
 
@@ -529,8 +555,21 @@ void BilateralWindowMatcher::debug_in_loop_cost(int i,
         << "tst" << ACTst;
 
     // Save winRef and winTst into both MATLAB and JPEG formats.
-    write_mat_matlab_format<uchar, uint>( ssPath.str(), "winRef", winRef, 1 );
-    write_mat_matlab_format<uchar, uint>( ssPath.str(), "winTst", winTst, 1 );
+    if ( CV_8UC1 == winRef.type() || CV_8UC3 == winRef.type() )
+    {
+        write_mat_matlab_format<uchar, uint>( ssPath.str(), "winRef", winRef, 1 );
+        write_mat_matlab_format<uchar, uint>( ssPath.str(), "winTst", winTst, 1 );
+    }
+    else if ( CV_32FC1 == winRef.type() || CV_32FC3 == winRef.type() )
+    {
+        write_mat_matlab_format<R_t, R_t>( ssPath.str(), "winRef", winRef, 0 );
+        write_mat_matlab_format<R_t, R_t>( ssPath.str(), "winTst", winTst, 0 );
+    }
+    else
+    {
+        EXCEPTION_BASE( "winRef.type() is supposed to be CV_8UC1, CV_8UC3, CV_32FC1, CV_32FC3." );
+    }
+    
     write_floating_point_mat_as_byte( ssPath.str() + "/winRef", winRef );
     write_floating_point_mat_as_byte( ssPath.str() + "/winTst", winTst );
 

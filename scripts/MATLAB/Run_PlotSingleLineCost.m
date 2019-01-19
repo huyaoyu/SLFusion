@@ -48,7 +48,7 @@ end % I
 
 % Plot the minimun cost line.
 h = figure('Name', 'Disparity', 'NumberTitle', 'off');
-plot( costs(:, 1), '-*' );
+plot( medfilt1( costs(:, 1), 11 ), '-*' );
 xlabel('x location', 'FontSize', FONT_SIZE_LABEL);
 ylabel('disparity of minimum cost', 'FontSize', FONT_SIZE_LABEL);
 title('Disparity of minimum cost along single line', 'FontSize', FONT_SIZE_TITLE);

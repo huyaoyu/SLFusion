@@ -6,10 +6,11 @@ DONE. Write test code for wc().
     Wc with mask.
 
 * Finish the code of BilateralWindowMatcher::match_single_line( ) based on integral image.
-    Investigate the issues with "half black" ACRef.jpg and ACTst.jpg.
-    Test cases for BilateralWindowMatcher::match_single_line( ).
+    DONE. Investigate the issues with "half black" ACRef.jpg and ACTst.jpg.
+    DONE. Test cases for BilateralWindowMatcher::match_single_line( ).
 
 * Try to use Sobel filter.
+    Calculate the color weight based on original color. But calculate the TAD based on the gradient.
 
 * Modify the code of TAD calculation to use table instead of exp() function.
 

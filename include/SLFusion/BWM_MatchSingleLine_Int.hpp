@@ -22,8 +22,10 @@ void BilateralWindowMatcher::block_average_based_on_integral_image(
     const int bs   = mKernelSize;     // block shift.
     const int bsch = bs * channels;   // block shift with channels.
     int blockR0    = row - halfCount; // Upper-left row index of a block.
-    int blockC0S   = (col - halfCount) * channels; // Upper-left col index of a block in sint.
-    int blockC0M   = col - halfCount; // Upper-left col index of a block in mint.
+    const int bC0S = (col - halfCount) * channels; // Upper-left col index of a block in sint.
+    const int bC0M = col - halfCount; // Upper-left col index of a block in mint.
+    int blockC0S   = 0;
+    int blockC0M   = 0;
     int blockR1    = 0;               // blockR1 = blockR0 + bs.
     int blockC1S   = 0;               // blockC1S = blcokC0S + bsch.
     int blockC1M   = 0;               // blockC1M = blcokC0M + bs.
@@ -45,8 +47,8 @@ void BilateralWindowMatcher::block_average_based_on_integral_image(
         pVc    = vc.ptr<_VT>( i );
         colDst = 0; // Reset the column index of dst.
         // Reset the column index of sint and mint.
-        blockC0S = 0;
-        blockC0M = 0;
+        blockC0S = bC0S;
+        blockC0M = bC0M;
         blockR1  = blockR0 + bs; // Lower row index of sint and mint.
         
         // Get the pointers of sint.
@@ -69,11 +71,11 @@ void BilateralWindowMatcher::block_average_based_on_integral_image(
 
             if ( 0 != tempNum )
             {
-                bCK0 = blockC0S;     // Left column index of sint.
+                bCK0 = blockC0S;    // Left column index of sint.
                 bCK1 = bCK0 + bsch; // Right column index of sint.
 
                 for ( int k = 0; k < channels; ++k )
-                {    
+                {
                     tempSum = 
                           pS1[ bCK1 ] - pS0[ bCK1 ] - pS1[ bCK0 ] + pS0[ bCK0 ];
 
@@ -100,7 +102,7 @@ void BilateralWindowMatcher::block_average_based_on_integral_image(
     }
 }
 
-template <typename _IT> 
+template <typename _ST, typename _IT> 
 void BilateralWindowMatcher::match_single_line(
         const Mat& refMat, const Mat& tstMat, 
         const Mat& refInt, const Mat& tstInt,
@@ -258,18 +260,6 @@ void BilateralWindowMatcher::match_single_line(
             }
         }
 
-        // Update the ROIs in refMat and tstMat.
-        colRangeRef.start = idxRef - halfCount;
-        colRangeRef.end   = idxRef + halfCount + 1;
-        colRangeTst.start = idxTst - halfCount;
-        colRangeTst.end   = idxTst + halfCount + 1;
-
-        // Get the image patches and the masks.
-        windowRef  = refMat( rowRange, colRangeRef );
-        windowTst  = tstMat( rowRange, colRangeTst );
-        winMIntRef = refMInt( rowRange, colRangeRef );
-        winMIntTst = tstMInt( rowRange, colRangeTst );
-
         // ============================
         // = Calculate weight matrix. =
         // ============================
@@ -301,6 +291,18 @@ void BilateralWindowMatcher::match_single_line(
             if ( i == debug_get_next_index_avg_color() )
             {
                 std::cout << "Debug AC, i = " << i << std::endl;
+
+                // Update the ROIs in refMat and tstMat.
+                colRangeRef.start = idxRef - halfCount;
+                colRangeRef.end   = idxRef + halfCount + 1;
+                colRangeTst.start = idxTst - halfCount;
+                colRangeTst.end   = idxTst + halfCount + 1;
+
+                // Get the image patches and the masks.
+                windowRef  = refMat( rowRange, colRangeRef );
+                windowTst  = tstMat( rowRange, colRangeTst );
+                winMIntRef = refMInt( rowRange, colRangeRef );
+                winMIntTst = tstMInt( rowRange, colRangeTst );
 
                 debug_in_loop_wc_avg_color( i,
                     mACArrayRef[i], mACArrayTst[i],
@@ -369,7 +371,7 @@ void BilateralWindowMatcher::match_single_line(
 
             // Calculate the TAD over all the kernel blocks of windowRef and windowTst.
             // TADm<Real_t, Real_t>( mACArrayRef[i], mACArrayTst[idxAvgColorArrayTst], tad );
-            TADm<uchar, uchar>( windowRef, windowTst, tad );
+            TADm<_ST, _ST>( windowRef, windowTst, tad );
 
             // Calculate the cost value.
             tempDenominatorMatrix = ( mWss.array() * mWCArrayRef[i].array() * mWCArrayTst[idxAvgColorArrayTst].array() ).matrix();
