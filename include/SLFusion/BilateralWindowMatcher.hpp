@@ -2,6 +2,8 @@
 #ifndef __SLFUSION_BILATERALWINDOWMATCHER_HPP__
 #define __SLFUSION_BILATERALWINDOWMATCHER_HPP__
 
+#include "TopCommon.hpp"
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -364,6 +366,13 @@ public:
         int minDisp, int maxDisp, 
         MatchingCost<Real_t>* pMC, int* nMC = NULL);
 
+    void match_image(
+        const Mat& refMat, const Mat& tstMat, 
+        const Mat& refInt, const Mat& tstInt,
+        const Mat& refMInt, const Mat& tstMInt,
+        int minDisp, int maxDisp,
+        Mat& disp);
+
     /**
      * @return Buffer size is returned as number of bytes. 
      */
@@ -510,13 +519,15 @@ public:
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_03);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_04);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05);
-#endif
+
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_checkerboard);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_gradient);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_mb_tsukuba);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_checkerboard_integral_image);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_gradient_integral_image);
     FRIEND_TEST(Test_BilateralWindowMatcher, match_single_line_05_integral_image);
+#endif
+    FRIEND_TEST(Test_BilateralWindowMatcher, match_image_try_CUDA);
 };
 
 template<typename _TR, typename _TT> 

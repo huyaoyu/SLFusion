@@ -1215,8 +1215,6 @@ TEST_F(Test_BilateralWindowMatcher, match_single_line_05)
     delete [] mcArray; mcArray = NULL;
 }
 
-#endif
-
 template <typename _T> 
 static void create_checkboard(int height, int width, int low, int high, int type, OutputArray _dst)
 {
@@ -1943,6 +1941,153 @@ TEST_F( Test_BilateralWindowMatcher, match_single_line_05_integral_image )
         {
             mcArray[i].write(mcDir);
         }
+    }
+    catch ( exception_base& exp )
+    {
+        cout << boost::get_error_info<ExceptionInfoString>(exp) << endl;
+        ASSERT_FALSE(true);
+    }
+    catch ( exception& exp )
+    {
+        // delete [] mcArray; mcArray = NULL;
+
+        cout << "wat() " << exp.what() << endl;
+        ASSERT_FALSE(true);
+    }
+
+    // delete [] mcArray; mcArray = NULL;
+}
+
+#endif
+
+TEST_F( Test_BilateralWindowMatcher, match_image_try_CUDA )
+{
+    using namespace std;
+
+    // Read 1 image.
+    const string fn0 = "../data/SLFusion/Sep27_Pillar/Rectified_L_color.jpg";
+    const string fn1 = "../data/SLFusion/Sep27_Pillar/Rectified_R_color.jpg";
+    Mat tempImg, img0, img1;
+
+    vector<int> jpegParams { IMWRITE_JPEG_QUALITY, 100 };
+
+    const int kernelSize = 3;
+    const int numKernels = 13;
+
+    // Define the disparity range.
+    const int minDisparity = 600;
+    const int maxDisparity = 727;
+    const int numDisparity = maxDisparity - minDisparity + 1;
+    int pixels = 0;
+
+    try
+    {
+        img0 = imread( fn0, cv::IMREAD_COLOR );
+
+        cout << fn0 << " is read." << endl 
+             << "img0.rows = " << img0.rows << ", "
+             << "img0.cols = " << img0.cols 
+             << endl;
+
+        // Read img1.
+        img1 = imread( fn1, cv::IMREAD_COLOR );
+
+        // Save img0 and img1.
+        imwrite( "../data/SLFusion/match_single_line_05_integral_image/img0.jpg", img0, jpegParams );
+        imwrite( "../data/SLFusion/match_single_line_05_integral_image/img1.jpg", img1, jpegParams );
+        
+        // // Convert to CIELab color space.
+        // cvtColor( img0, img0, COLOR_BGR2Lab );
+        // cvtColor( img1, img1, COLOR_BGR2Lab );
+        // Convert to grayscale image.
+        Mat gray[2];
+        cvtColor( img0, gray[0], COLOR_BGR2GRAY );
+        cvtColor( img1, gray[1], COLOR_BGR2GRAY );
+        imwrite( "../data/SLFusion/match_single_line_05_integral_image/Gray_img0.jpg", gray[0], jpegParams );
+        imwrite( "../data/SLFusion/match_single_line_05_integral_image/Gray_img1.jpg", gray[1], jpegParams );
+
+        // x-derivative.
+        Scharr( gray[0], img0, CV_32FC1, 1, 0, 1.0, 0.0 );
+        Scharr( gray[1], img1, CV_32FC1, 1, 0, 1.0, 0.0 );
+
+        // img0 = abs(img0);
+        // img1 = abs(img1);
+
+        // Mat tempInt;
+        // integral( img0, tempInt, CV_32FC1 );
+        // cout << "tempInt.at<R_t> = " << tempInt.at<R_t>( img0.rows, img0.cols ) << endl; 
+        write_floating_point_mat_as_byte( "../data/SLFusion/match_single_line_05_integral_image/Scharr_img0.jpg", img0 );
+        write_floating_point_mat_as_byte( "../data/SLFusion/match_single_line_05_integral_image/Scharr_img1.jpg", img1 );
+
+        // Mat lapImg[2];
+        // Laplacian( img0, lapImg[0], CV_32FC1 );
+        // Laplacian( img1, lapImg[1], CV_32FC1 );
+
+        // convertScaleAbs( lapImg[0], lapImg[0] );
+        // convertScaleAbs( lapImg[1], lapImg[1] );
+
+        // lapImg[0].convertTo( img0, CV_8UC1 );
+        // lapImg[1].convertTo( img1, CV_8UC1 );
+
+        cout << "img0.channels() = " << img0.channels() << endl;
+
+        // Padding.
+        Mat padded[2], paddedMask[2];
+        Scalar s = Scalar(0, 0, 0);
+        if ( 0 != Run_SLFusion::put_padded_mat( img0, kernelSize, numKernels, s, padded[0], paddedMask[0], SLF_MASK ) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        if ( 0 != Run_SLFusion::put_padded_mat( img1, kernelSize, numKernels, s, padded[1], paddedMask[1], SLF_MASK ) )
+        {
+            ASSERT_FALSE(true);
+        }
+
+        cout << "Size of padded: (" << padded[0].rows << ", " << padded[0].cols << ")" << endl;
+
+        // imwrite( "../data/SLFusion/match_single_line_05_integral_image/padded[0].jpg", padded[0], jpegParams );
+        // imwrite( "../data/SLFusion/match_single_line_05_integral_image/padded[1].jpg", padded[1], jpegParams );
+
+        pixels = padded[0].cols - minDisparity - ( kernelSize * numKernels - 1 );
+
+        cout << "pixels = " << pixels << endl;
+
+        // Calculate matching cost.
+        
+        Mat refInt, tstInt, refMInt, tstMInt;
+        Mat maskInv;
+
+        maskInv = SLF_MASK - paddedMask[0];
+        padded[0].setTo( Scalar::all(0), maskInv );
+
+        integral( padded[0], refInt, CV_32FC3 );
+        integral( paddedMask[0], refMInt, CV_32SC1 );
+
+        maskInv = SLF_MASK - paddedMask[1];
+        padded[1].setTo( Scalar::all(0), maskInv );
+
+        integral( padded[1], tstInt, CV_32FC3 );
+        integral( paddedMask[1], tstMInt, CV_32SC1 );
+
+        imwrite( "../data/SLFusion/match_single_line_05_integral_image/padded[0].jpg", padded[0], jpegParams );
+        imwrite( "../data/SLFusion/match_single_line_05_integral_image/padded[1].jpg", padded[1], jpegParams );
+
+        BilateralWindowMatcher bwm( kernelSize, numKernels );
+
+        // bwm.match_single_line<R_t, R_t>( padded[0], padded[1], refInt, tstInt, refMInt, tstMInt, 
+        //     padded[0].rows / 2, minDisparity, maxDisparity, mcArray.get() );
+
+        Mat disp = Mat( img0.rows, img0.cols, CV_32FC1 );
+        disp.setTo( Scalar::all(0) );
+
+        bwm.match_image( padded[0], padded[1], refInt, tstInt, refMInt, tstMInt, 
+            minDisparity, maxDisparity, disp);
+
+        // bwm.match_single_line( padded[0], padded[1], paddedMask[0], paddedMask[1],
+        //     padded[0].rows / 2, minDisparity, maxDisparity, mcArray.get());
+        cout << "Internal buffer size of BilateralWindowMatcher: " 
+             << bwm.get_internal_buffer_szie() / 1024.0 / 1024 << " MB." << endl;
     }
     catch ( exception_base& exp )
     {

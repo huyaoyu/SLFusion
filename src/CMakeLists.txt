@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.5)
-project(SLFusion)
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
+project(SLFusion LANGUAGES CXX CUDA)
 
 # ## Compile as C++11
 # add_compile_options(-std=c++11)
@@ -8,8 +8,8 @@ project(SLFusion)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+add_subdirectory(SL/SLFusion/CUDA)
+set( LOCAL_LIBS ${LOCAL_LIBS} slf_cr )
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
@@ -105,7 +105,8 @@ SET( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
 # Specify libraries to link a library or executable target against
 target_link_libraries(exe_${PROJECT_NAME} ${OpenCV_LIBS}
   ${LIB_BOOST_EXCEPTION}
-  ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${CNPY_LIBRARIES} z
+  ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${CNPY_LIBRARIES} z 
+  ${LOCAL_LIBS}
 )
 
 # Test section.
@@ -124,5 +125,6 @@ message(STATUS "GTest_LIBRARIES = ${GTEST_LIBRARIES}")
 target_link_libraries(test_${PROJECT_NAME} 
   ${GTEST_LIBRARIES} 
   ${OpenCV_LIBS} ${LIB_BOOST_EXCEPTION}
-  ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${CNPY_LIBRARIES} z
+  ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${CNPY_LIBRARIES} z 
+  ${LOCAL_LIBS}
 )

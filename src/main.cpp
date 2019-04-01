@@ -5,6 +5,8 @@
  *      Author: yyhu
  */
 
+#include "TopCommon.hpp"
+
 #include <iostream>
 #include <vector>
 

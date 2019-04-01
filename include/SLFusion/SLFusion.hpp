@@ -8,6 +8,8 @@
 #ifndef INCLUDE_SLFUSION_SLFUSION_HPP_
 #define INCLUDE_SLFUSION_SLFUSION_HPP_
 
+#include "TopCommon.hpp"
+
 #include <iostream>
 #include <sstream>
 #include <string>

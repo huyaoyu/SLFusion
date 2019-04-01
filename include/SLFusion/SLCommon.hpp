@@ -1,6 +1,8 @@
 #ifndef __SLFUSION_SLCOMMON_HPP__
 #define __SLFUSION_SLCOMMON_HPP__
 
+#include "TopCommon.hpp"
+
 #include <iostream>
 #include <opencv2/core.hpp>
 
