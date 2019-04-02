@@ -2,12 +2,12 @@ cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
 project(SLF_CUDARoutines LANGUAGES CXX CUDA)
 
-# set(CMAKE_BUILD_TYPE Debug)
-# set(
-#     CUDA_NVCC_FLAGS
-#     ${CUDA_NVCC_FLAGS};
-#     -g -G
-# )
+set(CMAKE_BUILD_TYPE Debug)
+set(
+    CUDA_NVCC_FLAGS
+    ${CUDA_NVCC_FLAGS};
+    -g -G
+)
 
 set( PROJECT_INCLUDES "../../../../include" )
 

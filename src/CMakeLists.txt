@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 project(SLFusion LANGUAGES CXX CUDA)
 
+set(CMAKE_BUILD_TYPE Debug)
+
 # ## Compile as C++11
 # add_compile_options(-std=c++11)
 

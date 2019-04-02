@@ -27,6 +27,8 @@ void BilateralWindowMatcher::match_image(
 {
     int res;
 
+    // Must test the continuity of the memory of the OpenCV objects.
+
     CUDAMatcher cm = CUDAMatcher();
 
     res = cm.cuda_match_image( 
