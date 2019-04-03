@@ -5,7 +5,7 @@
 
 #include <iostream>
 
-#define __CUDA_DEBUG__
+// #define __CUDA_DEBUG__
 
 namespace slf_cuda
 {
@@ -27,11 +27,13 @@ typedef struct
 
 using namespace slf_cuda;
 
+extern __shared__ CRReal_t crShared[];
+
 /**
  * \param upX The upper left corner x index of the window. X index must be increase in terms of channels.
  * \param upY The upper left corner y index of the window. 
  */
-__device__ void put_reference_window( const Image_t* ref, Intensity_t* win, int upX, int upY, int winWidth )
+__device__ void put_reference_window( const Image_t* ref, CRReal_t* win, int upX, int upY, int winWidth )
 {
     int x = 0;
     const int stride = blockDim.x;
@@ -99,13 +101,12 @@ __global__ void __cuda_match_image(
 //    printf("gridIdx.x: %d.", gridIdx.x);
 #endif
     // Shared memory inside a block.
-    extern __shared__ CRReal_t crShared[];
     const int winWidth = kernelSize * numKernels;
     const int winSize  = winWidth * winWidth;
 
-    Intensity_t* winRef = (Intensity_t*)crShared;
-    CRReal_t* wcRef     = (CRReal_t*)( crShared + channels * winSize * sizeof( Intensity_t ) );
-    CRReal_t* costs     = (CRReal_t*)( wcRef + winSize * sizeof(CRReal_t) );
+    CRReal_t* winRef = (CRReal_t*)crShared;
+    CRReal_t* wcRef  = (CRReal_t*)( crShared + channels * winSize * sizeof( CRReal_t ) );
+    CRReal_t* costs  = (CRReal_t*)( wcRef + winSize * sizeof(CRReal_t) );
 
     // Local memory for each thread.
     Image_t ref;
@@ -218,7 +219,15 @@ int CUDAMatcher::cuda_match_image(
     //     dRefMat, dTstMat, dRefInt, dTstInt, dRefMInt, dTstMInt, kernelSize, numKernels, dWss,
     //     minDisp, maxDisp, dDisp );
 
-    __cuda_match_image<<<1, 1>>>( H, W, channels,
+    // Calculate the external shared memory needed.
+    const int crExSharedSize = 
+        channels * sizeWin * sizeof( CRReal_t ) + 
+        sizeWin * sizeof( CRReal_t ) + 
+        ( maxDisp - minDisp + 1 ) * sizeof( CRReal_t );
+    
+    printf("Shared memory for each block: %d Bytes.\n", crExSharedSize);
+
+    __cuda_match_image<<<dim3(1,3040,1), dim3(64,1,1), (size_t)crExSharedSize>>>( H, W, channels,
         dRefMat, dTstMat, dRefInt, dTstInt, dRefMInt, dTstMInt, kernelSize, numKernels, dWss,
         minDisp, maxDisp, dDisp );
 
