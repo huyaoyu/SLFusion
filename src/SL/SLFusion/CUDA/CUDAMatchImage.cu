@@ -30,14 +30,15 @@ using namespace slf_cuda;
 extern __shared__ CRReal_t crShared[];
 
 /**
- * \param upX The upper left corner x index of the window. X index must be increase in terms of channels.
- * \param upY The upper left corner y index of the window. 
+ * \param X The x index of the window center. X index must be increase in terms of channels.
+ * \param Y The y index of the window center. 
  */
-__device__ void put_reference_window( const Image_t* ref, CRReal_t* win, int upX, int upY, int winWidth )
+__device__ void put_reference_window( const Image_t* ref, CRReal_t* win, int X, int Y, int winWidth )
 {
     int x = 0;
     const int stride = blockDim.x;
     const int winSize = winWidth * winWidth;
+    const int half = ( winWidth - 1 ) / 2;
 
     int y = 0;
 
@@ -58,8 +59,8 @@ __device__ void put_reference_window( const Image_t* ref, CRReal_t* win, int upX
 #ifdef __CUDA_DEBUG__
             printf("x: %d, y: %d\n", x, y);
 #endif
-            x = (upX + x) * ref->channels;
-            y = (upY + y) * imgStride;
+            x = (X - half + x) * ref->channels;
+            y = (Y - half + y) * imgStride;
             fillStart = i * ref->channels;
 
 #ifdef __CUDA_DEBUG__
